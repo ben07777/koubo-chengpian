@@ -32,6 +32,11 @@ function icon(name, size, parent, style) {
     Object.assign({ width: size + 'px', height: size + 'px' }, style || {}));
   return e;
 }
+function drawOn(e) {  // 线条图标描边画出：k=0 看不见，k=1 画完
+  const ps = [...e.querySelectorAll('path,circle,rect,line,polyline,polygon,ellipse')];
+  ps.forEach(p => { p.setAttribute('pathLength', '1'); p.style.strokeDasharray = '1 1'; p.style.strokeDashoffset = '1'; });
+  return k => ps.forEach((p, i) => { const kk = clamp(k * 1.35 - 0.35 * i / Math.max(1, ps.length - 1)); p.style.strokeDashoffset = (1 - kk).toFixed(4); p.style.opacity = kk > 0.001 ? 1 : 0; });
+}
 function abs(e, x, y, w) { Object.assign(e.style, { position: 'absolute', left: x + 'px', top: y + 'px' }); if (w) e.style.width = w + 'px'; return e; }
 const kinSize = n => n <= 5 ? 150 : n <= 7 ? 128 : n <= 9 ? 108 : n <= 12 ? 92 : 84;
 const txtSize = (s, big = 84) => { const n = Math.max(...String(plain(s)).split('\n').map(x => x.length)); return n <= 6 ? big : n <= 8 ? big * .86 : n <= 11 ? big * .74 : big * .64; };
@@ -42,8 +47,9 @@ function kinLine(parent, li, size) {
   const box = el('div', 'kin', null, parent, { fontSize: size + 'px', lineHeight: 1.16, top: '0px' });
   const ch = l.cs.map((c, i) => {
     const sp = el('span', null, c[0], box);
-    if (m[i]) sp.style.color = 'var(--acc)';
-    return { e: sp, t: c[1] };
+    if (m[i]) Object.assign(sp.style, { color: 'var(--acc)', backgroundRepeat: 'no-repeat', backgroundSize: '0% 100%',
+      backgroundImage: 'linear-gradient(transparent 64%, color-mix(in srgb, var(--acc) 24%, transparent) 64%, color-mix(in srgb, var(--acc) 24%, transparent) 94%, transparent 94%)' });
+    return { e: sp, t: c[1], kw: m[i] };
   });
   return { box, ch, t0: l.t0, t1: l.t1, h: 0 };
 }
@@ -51,6 +57,7 @@ function updChars(ch, t) {
   for (const c of ch) {
     const k = P(t, c.t - 0.07, c.t + 0.2, E.outC), kb = P(t, c.t - 0.07, c.t + 0.32, E.outB);
     set(c.e, { o: k, y: (1 - k) * 40, s: 1.3 - 0.3 * kb, b: (1 - k) * 7 });
+    if (c.kw) c.e.style.backgroundSize = (P(t, c.t + 0.08, c.t + 0.34, E.outC) * 100).toFixed(1) + '% 100%';
   }
 }
 function KinStack(sc, cy, maxSize = 150) {
@@ -75,21 +82,26 @@ function KinStack(sc, cy, maxSize = 150) {
 // ---------- 各类镜头 ----------
 const BUILD = {
   hook(sc) {
-    const bgI = icon(sc.icon || 'sparkles', 560, sc.el, { position: 'absolute', left: '260px', top: '120px', opacity: .1 });
+    const bgI = icon(sc.icon || 'sparkles', 560, sc.el, { position: 'absolute', left: '260px', top: '120px', opacity: .14, color: 'var(--acc)' });
+    const dw = drawOn(bgI);
     const ks = KinStack(sc, CY - 20, 150);
     sc.noEnter = true; sc.noExit = true;
     return t => {
       const k = P(t, sc.t1 - 0.45, sc.t1 + 0.05, E.ioC);
       set(sc.el, { o: 1 - P(t, sc.t1 - 0.4, sc.t1 - 0.08, E.inC), y: -520 * k, s: 1 - 0.4 * k, b: 6 * k });
-      set(bgI, { r: noise1(t * .4, 4) * 8 + t * 3, s: 1 + 0.04 * Math.sin(t * 1.3), o: 0.1 });
+      set(bgI, { r: noise1(t * .4, 4) * 8 + t * 3, s: 1 + 0.04 * Math.sin(t * 1.3), o: 0.14 }); dw(P(t, sc.t0, sc.t0 + 1.1, E.ioC));
       ks.upd(t);
     };
   },
   say(sc) {
-    const bgI = sc.icon ? icon(sc.icon, 470, sc.el, { position: 'absolute', left: '305px', top: '165px', opacity: .09 }) : null;
+    const bgI = sc.icon ? icon(sc.icon, 470, sc.el, { position: 'absolute', left: '305px', top: '165px', opacity: .15, color: 'var(--acc)' }) : null;
+    const dw = bgI ? drawOn(bgI) : null;
     const ks = KinStack(sc, CY);
     sc.hideSubs = true;
-    return t => { if (bgI) set(bgI, { r: noise1(t * .3, 7) * 9, y: Math.sin(t * 1.1) * 14, o: .09 }); ks.upd(t); };
+    return t => {
+      if (bgI) { set(bgI, { r: noise1(t * .3, 7) * 9, y: Math.sin(t * 1.1) * 14, s: 0.9 + 0.1 * P(t, sc.t0, sc.t0 + 1.0, E.outB), o: .15 }); dw(P(t, sc.t0 + 0.05, sc.t0 + 1.0, E.ioC)); }
+      ks.upd(t);
+    };
   },
   question(sc) {
     const q = abs(el('div', 'big', '?', sc.el, { fontSize: '420px', lineHeight: 1, color: 'var(--acc)', width: '1080px', textAlign: 'center' }), 0, -40);
@@ -119,6 +131,7 @@ const BUILD = {
     };
   },
   myth(sc) {
+    if (sc.idx === 0) sc.el.style.top = '-250px';  // 开场就是误区卡时，顶上的标题带还没落下，整张卡往上提，别让上半屏空着
     const pill = el('div', 'pill', '', sc.el); icon('users', 46, pill, { color: 'var(--sub)' }); el('span', null, sc.label, pill);
     abs(pill, 0, 30); pill.style.left = '50%'; pill.style.translate = '-50% 0';
     const card = abs(el('div', 'card', null, sc.el, { height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }), 100, 150, 880);
@@ -126,7 +139,7 @@ const BUILD = {
     const strike = abs(el('div', null, null, card, { height: '12px', background: 'var(--bad)', borderRadius: '6px', transformOrigin: '0 50%' }), 50, 154, 780);
     const stamp = abs(el('div', 'stamp', '✕ 误区', sc.el), 620, 95);
     const fact = abs(el('div', null, null, sc.el, { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '18px', font: `${txtSize(sc.fact + '000', 78)}px Glow`, color: 'var(--good)' }), 90, 540, 900);
-    icon('circle-check', 80, fact, { color: 'var(--good)' }); el('span', null, '其实：' + sc.fact, fact);
+    icon('circle-check', 80, fact, { color: 'var(--good)' }); el('span', null, sc.factFull || ('其实：' + sc.fact), fact);
     SHAKES.push([sc.factT + 0.12, 16]);
     return t => {
       const kp = P(t, sc.t0, sc.t0 + 0.45, E.outB); pill.style.opacity = kp; pill.style.transform = `translateY(${(1 - kp) * 30}px)`;
@@ -154,6 +167,28 @@ const BUILD = {
       set(A, { o: ka * (1 - 0.4 * kb), x: (1 - ka) * -140, s: 1 - 0.04 * kb });
       set(B, { o: kb, x: (1 - kb) * 140, s: 0.94 + 0.06 * kb });
       const kr = P(t, sc.R.t - 0.3, sc.R.t + 0.1, E.outC); set(arr, { o: kr, y: (1 - kr) * -30 });
+    };
+  },
+  flip(sc) {
+    sc.hideSubs = true;
+    const hd = abs(el('div', 'big', sc.head, sc.el, { fontSize: txtSize(sc.head, 72) + 'px', color: 'var(--sub)', textAlign: 'center' }), 90, 10, 900);
+    const aw = abs(el('div', null, null, sc.el, { textAlign: 'center' }), 90, 118, 900);
+    const aT = el('span', 'big', sc.A, aw, { display: 'inline-block', fontSize: txtSize(sc.A, 170) + 'px', lineHeight: 1.1 });
+    const strike = el('div', null, null, sc.el, { position: 'absolute', height: '20px', background: 'var(--bad)', borderRadius: '10px', transformOrigin: '0 50%' });
+    sc.measure.push(() => { const w = aT.offsetWidth, h = aT.offsetHeight; Object.assign(strike.style, { left: (540 - w / 2 - 28) + 'px', width: (w + 56) + 'px', top: (118 + h * 0.52 - 10) + 'px' }); });
+    const bw = abs(el('div', null, null, sc.el, { textAlign: 'center' }), 60, 430, 960);
+    el('div', null, sc.bLabel, bw, { display: 'inline-block', font: '58px Smiley', color: 'var(--accInk)', background: 'var(--acc)', padding: '4px 28px 10px', borderRadius: '16px', marginBottom: '20px' });
+    el('br', null, null, bw);
+    const kwB = sc.kw && sc.B.includes(sc.kw) && sc.kw.length < sc.B.length ? sc.B.replace(sc.kw, '[[' + sc.kw + ']]') : sc.B;
+    el('span', 'big', hl(kwB), bw, { display: 'inline-block', fontSize: txtSize(sc.B, 128) + 'px', lineHeight: 1.12 });
+    SHAKES.push([sc.tB + 0.1, 14]);
+    return t => {
+      const k0 = P(t, sc.t0, sc.t0 + 0.4, E.outC); set(hd, { o: k0, y: (1 - k0) * 30 });
+      const ka = clamp((t - sc.tA + 0.15) / 0.7), ks = P(t, sc.tB - 0.14, sc.tB + 0.16, E.outC);
+      set(aw, { o: (ka > 0 ? 1 : 0) * (1 - 0.6 * ks), s: (0.6 + 0.4 * SP(ka, 1.2, 5)) * (1 - 0.08 * ks) });
+      strike.style.transform = `rotate(-2.5deg) scaleX(${ks.toFixed(4)})`; strike.style.opacity = ks > 0 ? 1 : 0;
+      const kb = P(t, sc.tB - 0.02, sc.tB + 0.32, E.outB2);
+      set(bw, { o: P(t, sc.tB - 0.05, sc.tB + 0.08), s: (1.45 - 0.45 * kb) * (1 + 0.025 * Math.sin(Math.max(0, t - sc.tB - 0.3) * 2.2)), y: (1 - kb) * -40 });
     };
   },
   pair(sc) {
@@ -277,7 +312,8 @@ function build() {
 
   // 镜头
   for (const s of PL.scenes) {
-    const sc = Object.assign({}, s, { el: el('div', 'scene', null, CAM), measure: [] });
+    const sc = Object.assign({}, s, { el: el('div', 'scene', null, CAM), measure: [], idx: SCN.length });
+    if (!SCN.length) sc.noEnter = true;  // 第一帧就要有东西，不从透明淡进
     sc.upd = (BUILD[s.type] || BUILD.say)(sc);
     SCN.push(sc);
   }
@@ -371,7 +407,10 @@ function build() {
       sc.upd(t);
       if (!sc.noEnter || !sc.noExit) {
         const a = sc.noEnter ? 1 : P(t, sc.t0 - 0.14, sc.t0 + 0.36, E.outC), b = sc.noExit ? 0 : P(t, sc.t1 - 0.26, sc.t1 + 0.05, E.inC);
-        set(sc.el, { o: a * (1 - b), s: (0.93 + 0.07 * a) * (1 + 0.08 * b), y: (1 - a) * 60 - b * 30, b: (1 - a) * 9 + b * 9 });
+        const v = sc.idx % 3;
+        if (v === 1) set(sc.el, { o: a * (1 - b), x: (1 - a) * 260 - b * 260, r: (1 - a) * 2.5 - b * 2.5, s: 1, b: (1 - a) * 6 + b * 6 });
+        else if (v === 2) set(sc.el, { o: a * (1 - b), s: (1.16 - 0.16 * a) * (1 - 0.1 * b), b: (1 - a) * 10 + b * 8 });
+        else set(sc.el, { o: a * (1 - b), s: (0.93 + 0.07 * a) * (1 + 0.08 * b), y: (1 - a) * 60 - b * 30, b: (1 - a) * 9 + b * 9 });
       }
     }
     cur = cur || SCN[0];

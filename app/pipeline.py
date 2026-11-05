@@ -194,7 +194,7 @@ class Job:
             raise
 
 
-NAMES = dict(hook='开场大字', say='大字跳出', question='问号', cta='收尾印章', myth='误区卡', compare='前后对比', pair='圆章并列',
+NAMES = dict(hook='开场大字', say='大字跳出', question='问号', cta='收尾印章', myth='误区卡', compare='前后对比', flip='划掉改写', pair='圆章并列',
              range='区间条', stat='数字滚动', list='清单卡')
 
 

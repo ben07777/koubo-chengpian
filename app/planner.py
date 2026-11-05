@@ -1,7 +1,8 @@
 # 看内容定画面：把逐字听写变成「分镜计划」（plan）。
 # 不联网、不用钥匙：靠中文口播里的常见信号判断画面——
 #   数字 → 滚数；A 到 B → 区间条；第一第二第三 → 清单卡；很多人以为…其实 → 误区卡；
-#   以前…现在 / 不是…而是 → 对比两栏；两件事：A 和 B → 圆章；问句 → 问号；其余 → 大字逐字跳。
+#   以前…现在 / 不是…而是 / A，B 却… → 对比两栏；不是A，就是B（分两句说）→ 划掉改写；
+#   两件事：A 和 B → 圆章；问句 → 问号；其余 → 大字逐字跳。
 import math
 import re
 from difflib import SequenceMatcher
@@ -31,6 +32,9 @@ FACT_RE = re.compile(r'^(其实|但是|但|可是|然而|事实上|真相是|实
 OLD_RE = re.compile(r'^(以前|过去|原来|从前|之前|早年)(的)?')
 NEW_RE = re.compile(r'^(现在|如今|而现在|而如今|后来|今天)(的)?')
 NOTBUT_RE = re.compile(r'不是(.{2,14}?)[，,]?而是(.{2,14})')
+FLIP_A = re.compile(r'^(.{0,8}?)不是(.{1,10})$')                 # 「很多公司不是亏死的」
+FLIP_B = re.compile(r'^(而是|就是|反而是|只是|是)(.{2,14})$')       # 「就是被这个东西拖垮的」
+BUT_RE = re.compile(r'.{1,6}却.{1,6}')                             # 「手里却没钱」
 Q_RE = re.compile(r'([?？]$|为什么|为啥|怎么办|怎么|是不是|能不能|要不要|吗$|呢$|多少)')
 CTA_RE = re.compile(r'(今天就|现在就|赶紧|记得|试试|去做|去试|收藏|下次|马上)')
 FILLER = re.compile(r'^(所以|那么|然后|而且|并且|另外|还有|就是|其实|好|那|嗯|呃|啊)[，,。\s]*')
@@ -223,8 +227,25 @@ def plan(lines, dur, title=None, theme='night', tag=None):
         tl = [x for x in title if x.strip()][:2]
     else:
         tl = split_title(''.join(head_lines) if len(head_lines) == 1 else head_lines)
-    add('hook', 0, hook_end, icon=icon_for(''.join(T[:hook_end]), 'sparkles'))
-    i = hook_end
+    def flip_at(k):
+        m = FLIP_A.match(T[k]) if k + 1 < n else None   # 问句（「你是不是很累」）不算
+        return bool(m and m.group(2) not in ('吧', '啊', '呀', '的', '了', '吗', '嘛', '呢') and '是不是' not in T[k] and not Q_RE.search(T[k])
+                    and FLIP_B.match(T[k + 1]) and not NOTBUT_RE.search(T[k]))
+
+    def but_at(k):  # 「账上写着赚钱 / 手里却没钱」：前一句摆现象，后一句带「却」
+        return (k + 1 < n and BUT_RE.fullmatch(T[k + 1]) is not None and 3 <= len(T[k]) <= 14
+                and '却' not in T[k] and not NUM_RE.search(T[k] + T[k + 1]) and not MYTH_RE.search(T[k]))
+
+    jf = next((k for k in range(1, min(4, n)) if FACT_RE.match(T[k])), None) if n >= 2 and MYTH_RE.search(T[0]) else None
+    rest0 = clean(MYTH_RE.split(T[0])[-1]) if jf else ''
+    if jf and len(rest0) >= 4:
+        fact = clean(FACT_RE.sub('', T[jf])) or T[jf]
+        add('myth', 0, jf + 1, label=clean(MYTH_RE.search(T[0]).group(0)), myth=rest0, mythT=lines[0]['t0'],
+            fact=fact, factFull=T[jf] if len(fact) <= 3 else '', factT=lines[jf]['t0'], icon=icon_for(''.join(T[:jf + 1]), 'sparkles'))
+        i = jf + 1
+    else:
+        add('hook', 0, hook_end, icon=icon_for(''.join(T[:hook_end]), 'sparkles'))
+        i = hook_end
 
     while i < n:
         s = T[i]
@@ -254,7 +275,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
                 myth = rest if len(rest) >= 4 else T[i + 1]
                 fact = clean(FACT_RE.sub('', T[j])) or T[j]
                 add('myth', lead, j + 1, label=clean(MYTH_RE.search(s).group(0)), myth=myth, mythT=lines[myth_k]['t0'],
-                    fact=fact, factT=lines[j]['t0'])
+                    fact=fact, factFull=T[j] if len(fact) <= 3 else '', factT=lines[j]['t0'])
                 i = j + 1; continue
         # 对比：以前 … 现在 …
         if OLD_RE.match(s):
@@ -267,6 +288,15 @@ def plan(lines, dur, title=None, theme='night', tag=None):
                 R = dict(label=NEW_RE.match(T[j]).group(1), text=rt, t=lines[j]['t0'])
                 add('compare', lead, end, L=L, R=R)
                 i = end; continue
+        if flip_at(i):
+            ma, mb = FLIP_A.match(s), FLIP_B.match(T[i + 1])
+            add('flip', lead, i + 2, head=clean(ma.group(1)) + '不是', A=clean(ma.group(2)), tA=char_time(lines, i, ma.group(2)),
+                bLabel=mb.group(1), B=clean(mb.group(2)), tB=lines[i + 1]['t0'], kw=find_kw(mb.group(2)))
+            i += 2; continue
+        if but_at(i):
+            add('compare', lead, i + 2, L=dict(label='看上去', text=clean(strip_filler(s)), t=lines[i]['t0']),
+                R=dict(label='实际上', text=clean(T[i + 1]), t=lines[i + 1]['t0']))
+            i += 2; continue
         m = NOTBUT_RE.search(s)
         if m:
             add('compare', lead, i + 1, L=dict(label='不是', text=clean(m.group(1)), t=lines[i]['t0'], icon='circle-x'),
@@ -309,7 +339,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
             i += 1; continue
         # 其余：大字逐字跳，最多 3 行一组
         j = i + 1
-        while j < n and j < i + 3 and not is_cue(j) and lines[j]['t1'] - lines[i]['t0'] < 6.5                 and not (CTA_RE.search(T[j]) and j >= n - 3):
+        while j < n and j < i + 3 and not is_cue(j) and not flip_at(j) and not but_at(j) and lines[j]['t1'] - lines[i]['t0'] < 6.5                 and not (CTA_RE.search(T[j]) and j >= n - 3):
             j += 1
         add('say', lead, j, icon=icon_for(''.join(T[i:j])))
         i = j
