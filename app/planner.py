@@ -32,9 +32,10 @@ FACT_RE = re.compile(r'^(其实|但是|但|可是|然而|事实上|真相是|实
 OLD_RE = re.compile(r'^(以前|过去|原来|从前|之前|早年)(的)?')
 NEW_RE = re.compile(r'^(现在|如今|而现在|而如今|后来|今天)(的)?')
 NOTBUT_RE = re.compile(r'不是(.{2,14}?)[，,]?而是(.{2,14})')
-FLIP_A = re.compile(r'^(.{0,8}?)不是(.{1,10})$')                 # 「很多公司不是亏死的」
-FLIP_B = re.compile(r'^(而是|就是|反而是|只是|是)(.{2,14})$')       # 「就是被这个东西拖垮的」
-BUT_RE = re.compile(r'.{1,6}却.{1,6}')                             # 「手里却没钱」
+FLIP_A = re.compile(r'^(.{0,8}?)不是(.{1,5})$')                  # 「很多公司不是亏死的」；被划掉的超过 5 个字一行放不下
+FLIP_B = re.compile(r'^(而是|就是|反而是|只是|是)(.{2,11})$')       # 「就是被这个东西拖垮的」
+EITHER_RE = re.compile(r'(天天|每天|总是|老是|整天|成天|一天到晚|要么|平时|经常)')  # 「天天不是喝酒 / 就是打牌」是二选一，不是改正
+BUT_RE = re.compile(r'.{1,6}(?<![冷忘推了退])却.{1,6}')            # 「手里却没钱」；冷却、忘却这类不算
 Q_RE = re.compile(r'([?？]$|为什么|为啥|怎么办|怎么|是不是|能不能|要不要|吗$|呢$|多少)')
 CTA_RE = re.compile(r'(今天就|现在就|赶紧|记得|试试|去做|去试|收藏|下次|马上)')
 FILLER = re.compile(r'^(所以|那么|然后|而且|并且|另外|还有|就是|其实|好|那|嗯|呃|啊)[，,。\s]*')
@@ -176,6 +177,13 @@ def clean(s):
     return s.strip('，。！？、；：,.!?;: ')
 
 
+def strip_fact(s):
+    prev = None
+    while prev != s:
+        prev = s; s = FACT_RE.sub('', s)
+    return clean(s)
+
+
 def strip_filler(s):
     prev = None
     while prev != s:
@@ -228,18 +236,29 @@ def plan(lines, dur, title=None, theme='night', tag=None):
     else:
         tl = split_title(''.join(head_lines) if len(head_lines) == 1 else head_lines)
     def flip_at(k):
-        m = FLIP_A.match(T[k]) if k + 1 < n else None   # 问句（「你是不是很累」）不算
-        return bool(m and m.group(2) not in ('吧', '啊', '呀', '的', '了', '吗', '嘛', '呢') and '是不是' not in T[k] and not Q_RE.search(T[k])
-                    and FLIP_B.match(T[k + 1]) and not NOTBUT_RE.search(T[k]))
+        m = FLIP_A.match(T[k]) if k + 1 < n else None   # 问句（「你是不是很累」）不算，两句里哪句是问句都不算
+        mb = FLIP_B.match(T[k + 1]) if m else None
+        if not (m and mb) or m.group(2) in ('吧', '啊', '呀', '的', '了', '吗', '嘛', '呢') or NOTBUT_RE.search(T[k]):
+            return False
+        if Q_RE.search(T[k]) or Q_RE.search(T[k + 1]) or T[k + 1].startswith(('是吧', '是啊', '是的', '是否')):
+            return False
+        # 「就是」也常当二选一用：前句有「天天 / 总是」，或者后半句不比前半句长（「喝酒 / 打牌」），就不当改正
+        if mb.group(1) == '就是' and (EITHER_RE.search(T[k]) or len(mb.group(2)) <= len(m.group(2))):
+            return False
+        return True
 
     def but_at(k):  # 「账上写着赚钱 / 手里却没钱」：前一句摆现象，后一句带「却」
         return (k + 1 < n and BUT_RE.fullmatch(T[k + 1]) is not None and 3 <= len(T[k]) <= 14
                 and '却' not in T[k] and not NUM_RE.search(T[k] + T[k + 1]) and not MYTH_RE.search(T[k]))
 
-    jf = next((k for k in range(1, min(4, n)) if FACT_RE.match(T[k])), None) if n >= 2 and MYTH_RE.search(T[0]) else None
+    m0 = MYTH_RE.search(T[0]) if n >= 2 else None
+    m0 = m0 if m0 and re.search('(以为|觉得|认为)$', m0.group(0)) else None
+    jf = next((k for k in range(1, min(4, n)) if FACT_RE.match(T[k])), None) if m0 else None
     rest0 = clean(MYTH_RE.split(T[0])[-1]) if jf else ''
     if jf and len(rest0) >= 4:
-        fact = clean(FACT_RE.sub('', T[jf])) or T[jf]
+        if not title and len(clean(m0.group(0))) <= 12 and len(rest0) <= 12:
+            tl = [clean(m0.group(0)), rest0]          # 软件自己起的标题：「很多人以为 / 合同一签钱就到手了」，不吃「其实不是」那行
+        fact = strip_fact(T[jf]) or T[jf]
         add('myth', 0, jf + 1, label=clean(MYTH_RE.search(T[0]).group(0)), myth=rest0, mythT=lines[0]['t0'],
             fact=fact, factFull=T[jf] if len(fact) <= 3 else '', factT=lines[jf]['t0'], icon=icon_for(''.join(T[:jf + 1]), 'sparkles'))
         i = jf + 1
@@ -273,7 +292,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
                 rest = clean(MYTH_RE.split(s)[-1])
                 myth_k = i if len(rest) >= 4 else i + 1
                 myth = rest if len(rest) >= 4 else T[i + 1]
-                fact = clean(FACT_RE.sub('', T[j])) or T[j]
+                fact = strip_fact(T[j]) or T[j]
                 add('myth', lead, j + 1, label=clean(MYTH_RE.search(s).group(0)), myth=myth, mythT=lines[myth_k]['t0'],
                     fact=fact, factFull=T[j] if len(fact) <= 3 else '', factT=lines[j]['t0'])
                 i = j + 1; continue
@@ -383,6 +402,15 @@ def split_title(head):
             a, b = head.split(sep, 1)
             if 2 <= len(a) <= 12 and len(b) <= 13: return [a, clean(b)]
     k = (len(head) + 1) // 2
+    try:
+        import jieba
+        bounds, at = [], 0
+        for w in jieba.cut(head):
+            at += len(w); bounds.append(at)
+        ok = [b for b in bounds if 3 <= b <= len(head) - 3 and b <= 12 and len(head) - b <= 13]
+        if ok: k = min(ok, key=lambda b: abs(b - len(head) / 2))
+    except Exception:
+        pass
     return [head[:k], head[k:]]
 
 
