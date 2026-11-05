@@ -408,13 +408,6 @@ function build() {
         s.d.style.webkitTextStroke = '8px #000'; s.ch.forEach(c => { c.e.style.opacity = 1; c.e.style.color = ''; }); });
       return r; };
   }
-  // 试用版水印：斜着铺满屏的淡字，加右上角一个看得清的「试用版」；成片和封面都有
-  if (PL.trial) {
-    const wm = el('div', null, null, $('#frame'), { position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 99, pointerEvents: 'none' });
-    el('div', null, Array(14).fill(Array(4).fill('口播成片 · 试用版').join('　　　')).join('<br>'), wm,
-      { position: 'absolute', left: '-700px', top: '-500px', width: '2600px', font: '800 46px Noto', lineHeight: '230px', color: 'rgba(128,128,128,.24)', transform: 'rotate(-30deg)', whiteSpace: 'nowrap' });
-    el('div', null, '试用版', wm, { position: 'absolute', right: '40px', top: '40px', font: '800 40px Noto', color: '#fff', background: 'rgba(0,0,0,.5)', padding: '6px 22px 10px', borderRadius: '14px' });
-  }
   // 封面模式
   const cv = Q.get('cover');
   if (cv) {

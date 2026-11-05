@@ -29,8 +29,6 @@ textarea{width:100%;min-height:240px;font:16px/1.7 "Microsoft YaHei",sans-serif;
 input[type=text]{font-size:17px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;width:300px}
 .tip{color:var(--sub);font-size:14px}.err{color:var(--acc);font-weight:bold}
 a{color:var(--acc)}.hide{display:none}
-.trialtag{font-size:16px;vertical-align:middle;background:var(--acc);color:#fff;border-radius:8px;padding:2px 10px;margin-left:8px}
-#trial{margin-top:14px;background:#FFF6F3;border-radius:10px;padding:8px 14px;font-size:14px;color:var(--ink)}
 @media(max-width:760px){.res{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
 <h1>口播成片</h1>
@@ -49,7 +47,6 @@ a{color:var(--acc)}.hide{display:none}
   <div class="row"><span class="lab">自动剪辑</span><label><input type="checkbox" id="trim" checked> 自动剪掉气口和口误</label><span class="tip">句子之间过长的停顿剪短，“嗯”“呃”删掉，说错重说的只留最后一遍。剪了哪些地方，做完会列出来</span></div>
   <div class="row"><span class="lab">背景音乐</span><label><input type="checkbox" id="music"> 添加自动配乐</label><span class="tip">程序在本机合成轻音乐。生成后可以在下方修改区换成本地音乐</span></div>
   <div class="row"><button class="go" id="go" disabled>开始生成</button><span class="tip" id="fname">未选择文件</span></div>
-  <div id="trial" class="hide"></div>
 </div>
 
 <div class="card hide" id="prog">

@@ -19,7 +19,7 @@ def ff(*args):
     if r.returncode: raise RuntimeError('ffmpeg: ' + (r.stderr or '').strip()[-600:])
 
 
-# 出错时给买家看的人话：左边是技术报错里的关键词，右边是该怎么办
+# 出错时给用户看的人话：左边是技术报错里的关键词，右边是该怎么办
 HUMAN = [
     (('does not contain any stream', 'matches no streams', 'Output file is empty', 'no audio'), '这个文件里没有声音，请换一个有声音的录音或视频。'),
     (('Invalid data found', 'moov atom not found', 'could not find codec'), '文件无法打开，可能没录完整或已损坏。请在手机上重新导出后再试。'),
@@ -137,12 +137,11 @@ class Job:
                 if not vsrc: raise RuntimeError('找不到原视频，无法保留真人画面。请重新导入视频。')
                 self.mark('人脸', 10, '检测到视频画面，正在提取')
                 pmeta = person.prepare(vsrc, d, dur, render.ffmpeg(), log=lambda m: self.mark('人脸', None, m))
-                if cover_t is not None: pmeta['cover_t'] = round(min(max(float(cover_t), 0), dur - 1), 2)  # 买家自己挑的封面帧
+                if cover_t is not None: pmeta['cover_t'] = round(min(max(float(cover_t), 0), dur - 1), 2)  # 用户自己挑的封面帧
                 self.s['cover_t'] = pmeta['cover_t']
             self.mark('定画面', 15)
             p = planner.plan(lines, dur, title=title, theme=THEMES.get(theme, 'night'))
             if pmeta: p['person'] = person.for_plan(d, pmeta)
-            p['trial'] = False
             (d / 'plan.js').write_text('window.PLAN=' + json.dumps(p, ensure_ascii=False) + ';', encoding='utf-8')
             self.s['lines'] = [''.join(c[0] for c in l['cs']) for l in p['lines']]
             self.s['title'] = [planner.re.sub(r'\[\[|\]\]', '', x) for x in p['title']]

@@ -134,7 +134,7 @@ def apply(src, keep, out, ffmpeg, video):
 
 
 def write_list(cuts, path):
-    """给买家看的剪辑清单：原素材里哪几秒被剪了、为什么。"""
+    """剪辑清单：原素材里哪几秒被剪了、为什么。"""
     def mmss(x): return f'{int(x // 60)}:{x % 60:05.2f}'
     rows = ['下面是自动剪掉的地方（时间是原素材里的位置）。不想剪，导入时把「自动剪掉气口和口误」关掉再生成一次。', '']
     for c in cuts:
