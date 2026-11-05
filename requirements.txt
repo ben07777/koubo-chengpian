@@ -1,0 +1,7 @@
+numpy==2.5.1
+pillow==12.3.0
+opencv-python==5.0.0.93
+sherpa-onnx==1.13.8
+playwright==1.62.0
+jieba==0.42.1
+

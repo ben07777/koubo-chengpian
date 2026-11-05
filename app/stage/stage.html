@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'nonce-stageboot'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>stage</title>
+<style>
+@font-face{font-family:Glow;src:url(fonts/GlowSansSC-Condensed-Heavy.otf)}
+@font-face{font-family:Noto;src:url(fonts/NotoSansSC-VF.ttf);font-weight:100 900}
+@font-face{font-family:Smiley;src:url(fonts/SmileySans-Oblique.ttf)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+#frame{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--bg0);color:var(--ink);font-family:Noto,sans-serif;-webkit-font-smoothing:antialiased}
+#bg,#bg>*{position:absolute;inset:0}
+.blob{border-radius:50%;width:1100px;height:1100px;left:-10px;top:-10px;inset:auto}
+#grid{background-image:radial-gradient(var(--dot) 2.2px,transparent 2.6px);background-size:54px 54px;opacity:.9}
+#grain{position:absolute;inset:0;background:repeating-linear-gradient(103deg,transparent 0 3px,#fff3 4px,transparent 5px);opacity:var(--grain);mix-blend-mode:overlay;pointer-events:none}
+#top{position:absolute;left:0;top:0;width:1080px;height:470px}
+#tag{position:absolute;left:70px;top:168px;font:44px Smiley;color:var(--accInk);background:var(--acc);padding:6px 24px 8px;border-radius:14px;white-space:nowrap}
+#ttl{position:absolute;left:70px;top:236px;width:940px;font:86px/1.13 Glow;letter-spacing:1px;color:var(--ink)}
+#ttl .tl{display:block;white-space:nowrap}
+.hl{color:var(--acc);position:relative;display:inline-block}
+#prog{position:absolute;left:70px;top:456px;width:940px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+#prog i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:4px}
+#prog b{position:absolute;top:0;width:4px;height:8px;background:var(--bg0)}
+#stage{position:absolute;left:0;top:545px;width:1080px;height:800px;overflow:visible}
+#cam{position:absolute;inset:0;transform-origin:540px 400px}
+.scene{position:absolute;inset:0;display:none;transform-origin:540px 400px}
+#subs{position:absolute;left:60px;top:1372px;width:900px;height:150px;display:flex;align-items:center;justify-content:center}
+.sub{position:absolute;max-width:900px;text-align:center;font:800 62px/1.25 Noto;letter-spacing:1px;padding:8px 26px;border-radius:18px;background:var(--subBg);color:var(--subInk);-webkit-text-stroke:var(--subStroke);paint-order:stroke fill}
+.sub span{display:inline-block}
+#sweep{position:absolute;left:-600px;top:545px;width:420px;height:800px;background:linear-gradient(100deg,transparent,var(--sweep),transparent);pointer-events:none;opacity:0}
+#flash{position:absolute;inset:0;background:var(--acc);opacity:0;pointer-events:none;mix-blend-mode:screen}
+.kin{position:absolute;left:90px;width:900px;text-align:center;font-family:Glow;color:var(--ink);transform-origin:50% 50%}
+.kin span{display:inline-block;will-change:transform}
+.card{position:absolute;background:var(--card);border:3px solid var(--cardLine);border-radius:36px;box-shadow:var(--shadow)}
+.pill{position:absolute;display:flex;align-items:center;gap:12px;font:46px Smiley;padding:8px 26px 10px;border-radius:999px;white-space:nowrap;background:var(--card);border:3px solid var(--cardLine);color:var(--sub)}
+.ic svg{width:100%;height:100%;display:block}
+.ic{display:inline-block;color:var(--acc)}
+.num{font-family:Arial,sans-serif;font-weight:800;letter-spacing:-4px;line-height:1}
+.big{font-family:Glow}
+.stamp{position:absolute;font:92px Glow;color:var(--bad);border:10px solid var(--bad);border-radius:22px;padding:4px 30px 10px;white-space:nowrap;background:var(--bg0)}
+/* 封面 */
+#cover{position:absolute;inset:0;display:none}
+</style>
+</head><body>
+<div id="frame">
+  <div id="bg"><div class="blob" id="b1"></div><div class="blob" id="b2"></div><div class="blob" id="b3"></div><div id="grid"></div></div>
+  <div id="top"><div id="tag"></div><div id="ttl"></div><div id="prog"><i></i></div></div>
+  <div id="stage"><div id="cam"></div></div>
+  <div id="sweep"></div>
+  <div id="subs"></div>
+  <div id="cover"></div>
+  <div id="grain"></div>
+  <div id="flash"></div>
+</div>
+<script src="core.js"></script>
+<script src="icons.js"></script>
+<script nonce="stageboot">
+const Q = new URLSearchParams(location.search);
+const s = document.createElement('script'); s.src = Q.get('plan');
+s.onload = () => { const d = document.createElement('script'); d.src = 'director.js'; document.body.appendChild(d); };
+document.body.appendChild(s);
+</script>
+</body></html>

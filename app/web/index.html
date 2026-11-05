@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>口播成片</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E2412B'/%3E%3Cpath d='M24 18v28l22-14z' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#F5F3EE;--card:#fff;--ink:#1B1A17;--sub:#6E675C;--line:#E4DED3;--acc:#E2412B;--ok:#1E8F55}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Microsoft YaHei","PingFang SC",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:30px;margin:0}.lead{color:var(--sub);margin:4px 0 22px}
+.safe{display:inline-block;background:#E8F3EC;color:var(--ok);border-radius:8px;padding:2px 10px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+#drop{border:2.5px dashed #CFC6B6;border-radius:14px;padding:40px 16px;text-align:center;cursor:pointer;transition:.15s}
+#drop.on{border-color:var(--acc);background:#FFF6F3}#drop b{font-size:22px;display:block;margin-bottom:6px}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.lab{color:var(--sub);min-width:72px}
+.sw{border:2px solid var(--line);border-radius:12px;padding:8px 14px;cursor:pointer;background:#fff;display:flex;gap:8px;align-items:center;font-size:15px}
+#sw2{display:flex;gap:14px;flex-wrap:wrap}.sw i{width:26px;height:26px;border-radius:7px;display:inline-block}.sw.on{border-color:var(--ink)}
+button.go{background:var(--acc);color:#fff;border:0;border-radius:12px;font-size:19px;padding:12px 30px;cursor:pointer}
+button.go:disabled{opacity:.45;cursor:default}
+button.sec{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:8px 16px;cursor:pointer;font-size:15px}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}.steps span{padding:4px 12px;border-radius:99px;background:#EEE9E0;color:var(--sub);font-size:14px}
+.steps span.now{background:var(--acc);color:#fff}.steps span.ok{background:#E8F3EC;color:var(--ok)}
+.bar{height:10px;background:#EEE9E0;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+#log{color:var(--sub);font-size:14px;margin-top:10px;white-space:pre-line;max-height:120px;overflow:auto}
+.res{display:grid;grid-template-columns:300px 1fr;gap:22px}
+video{width:300px;height:533px;background:#000;border-radius:14px}
+.covers{display:flex;gap:12px;margin:8px 0}.covers img{height:200px;border-radius:10px;border:1px solid var(--line);display:block}.covers figure{margin:0;font-size:13px;color:var(--sub);text-align:center}
+textarea{width:100%;min-height:240px;font:16px/1.7 "Microsoft YaHei",sans-serif;border:1.5px solid var(--line);border-radius:10px;padding:10px}
+input[type=text]{font-size:17px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;width:300px}
+.tip{color:var(--sub);font-size:14px}.err{color:var(--acc);font-weight:bold}
+a{color:var(--acc)}.hide{display:none}
+.trialtag{font-size:16px;vertical-align:middle;background:var(--acc);color:#fff;border-radius:8px;padding:2px 10px;margin-left:8px}
+#trial{margin-top:14px;background:#FFF6F3;border-radius:10px;padding:8px 14px;font-size:14px;color:var(--ink)}
+@media(max-width:760px){.res{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<h1>口播成片</h1>
+<p class="lead">把一段口播剪成竖屏视频，字幕、重点词和两张封面一起生成。<br><span class="safe">本地运行 · 文件不上传 · 免登录 · 断网可用</span></p>
+
+<div class="card" id="pick">
+  <div id="drop"><b>点击导入文件，或将文件拖到此处</b>支持 mp3、m4a、wav、aac、mp4、mov 等常见格式，以普通话口播为主<br>素材时长 3 秒至 10 分钟，单个文件不超过 2GB</div>
+  <input type="file" id="file" class="hide" accept="audio/*,video/*">
+  <div class="row" id="themes"><span class="lab">录音配色</span>
+    <div class="sw on" data-t="夜幕"><i style="background:linear-gradient(135deg,#16244A,#0A0F1F);border:3px solid #FFB21E"></i>深蓝</div>
+    <div class="sw" data-t="白纸"><i style="background:#F3EDE2;border:3px solid #E2412B"></i>米白</div>
+    <div class="sw" data-t="薄荷"><i style="background:#E7F5EE;border:3px solid #0E9F6E"></i>薄荷绿</div>
+  </div>
+  <div class="row hide" id="prow"><span class="lab">真人出镜</span><label><input type="checkbox" id="keep" checked> 真人精剪 · 保留原画面</label><span class="tip">胶片开场，重点词随原声出现；横拍时按人脸位置裁竖屏。</span></div>
+  <div class="row hide" id="words"><label class="lab" for="focus">强调词</label><input id="focus" type="text" maxlength="50" placeholder="留空自动选词"><span class="tip">可填同一句里依次说到的 1–3 个词，用逗号隔开。</span></div>
+  <div class="row"><span class="lab">自动剪辑</span><label><input type="checkbox" id="trim" checked> 自动剪掉气口和口误</label><span class="tip">句子之间过长的停顿剪短，“嗯”“呃”删掉，说错重说的只留最后一遍。剪了哪些地方，做完会列出来</span></div>
+  <div class="row"><span class="lab">背景音乐</span><label><input type="checkbox" id="music"> 添加自动配乐</label><span class="tip">程序在本机合成轻音乐。生成后可以在下方修改区换成本地音乐</span></div>
+  <div class="row"><button class="go" id="go" disabled>开始生成</button><span class="tip" id="fname">未选择文件</span></div>
+  <div id="trial" class="hide"></div>
+</div>
+
+<div class="card hide" id="prog">
+  <div class="steps" id="steps"></div>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="eta" class="tip"></div>
+  <div id="log"></div>
+</div>
+
+<div class="card hide" id="done">
+  <div class="res">
+    <div><video id="vid" controls playsinline></video></div>
+    <div>
+      <h2 style="margin:0 0 6px">生成完成 <span class="tip" id="took"></span></h2>
+      <p class="tip hide" id="cutinfo"></p>
+      <div class="covers" id="covers"></div>
+      <div class="row" style="margin-top:6px">
+        <button class="sec" id="openDir">打开所在文件夹</button>
+        <a id="dl" download>下载视频</a> <a id="dlsrt" download>下载字幕（SRT）</a>
+      </div>
+      <p class="tip">画面里已经压好字幕了。SRT 是纯文字字幕文件，可以当文稿用；别再导进剪映或在平台上加字幕，否则会叠两层。<br>传到手机：把“成片_竖屏.mp4”拖进电脑版微信的“文件传输助手”，在手机上打开，长按保存到相册。</p>
+    </div>
+  </div>
+</div>
+
+<div class="card hide" id="edit">
+  <h3 style="margin:0">修改字幕和封面</h3>
+  <p class="tip">语音识别难免有同音错字（比如把“充”识别成“冲”）。一行对应一句字幕，直接改字即可，不要增删行。改完点“重新生成”，不用重新识别字幕，用时和第一次差不多。</p>
+  <div class="row" id="titleRow"><span class="lab">封面大字</span><input type="text" id="t1" maxlength="12" placeholder="第一行"> <input type="text" id="t2" maxlength="12" placeholder="第二行"><span class="tip">片头和封面上的大字，每行最多 12 个字</span></div>
+  <div class="row" style="display:block"><textarea id="lines"></textarea></div>
+  <div class="row" id="themes2"><span class="lab">录音配色</span><span id="sw2"></span></div>
+  <div class="row hide" id="prow2" hidden><span class="lab">真人出镜</span><label><input type="checkbox" id="keep2" checked> 真人精剪 · 保留原画面</label></div>
+  <div class="row hide" id="words2"><label class="lab" for="focus2">强调词</label><input id="focus2" type="text" maxlength="50" placeholder="留空自动选词"></div>
+  <div class="row hide" id="crow"><span class="lab">封面</span>使用第 <input type="number" id="ct" min="0" step="0.1" style="width:90px;font-size:17px;padding:6px 8px;border:1.5px solid var(--line);border-radius:10px"> 秒的画面
+    <button class="sec" id="ctNow">选用当前画面</button><span class="tip">对自动选的封面不满意？在上方视频里暂停到想要的画面，点“选用当前画面”，再点“重新生成”，封面才会更换。</span></div>
+  <div class="row"><span class="lab">背景音乐</span>
+    <label><input type="radio" name="m" value="on" checked> 自动配乐</label>
+    <label><input type="radio" name="m" value="off"> 不加音乐</label>
+    <label><input type="radio" name="m" value="mine"> 本地音乐：<input type="file" id="bgmf" accept="audio/*"></label>
+  </div>
+  <div class="row"><button class="go" id="redo">重新生成</button><span class="tip" id="redoTip"></span></div>
+</div>
+
+<p class="tip">生成的视频都保存在软件所在文件夹的“出片”文件夹里，每条视频一个子文件夹。整条不要了就删掉整个子文件夹，里面的文件不要单独删，否则没法重新生成。</p>
+</div>
+<script>
+const $ = s => document.querySelector(s); let theme = '夜幕', file = null, JOB = null, timer = null, t0 = 0;
+const stepsOf = s => ['听写', ...(s.trim ? ['剪气口'] : []), ...(s.person ? ['人脸'] : []), '定画面', ...(s.music === false && !s.my_music ? [] : ['配乐']), '画画面', '合成', '封面'];
+let lastMine = false, originalLines=0;
+const mmss = x => x >= 60 ? `${Math.floor(x / 60)} 分 ${x % 60} 秒` : `${x} 秒`;
+const STEP_NAME = { '听写': '识别字幕', '剪气口': '剪气口和口误', '人脸': '识别人脸', '定画面': '匹配画面', '配乐': '添加音乐', '画画面': '渲染画面', '合成': '合成视频', '封面': '生成封面' };
+document.querySelectorAll('#pick .sw').forEach(e => e.onclick = () => { document.querySelectorAll('#pick .sw').forEach(x => x.classList.remove('on')); e.classList.add('on'); theme = e.dataset.t; });
+$('#sw2').innerHTML = $('#pick .row .sw').parentElement.innerHTML.replace('<span class="lab">录音配色</span>', '');
+let theme2 = '夜幕';
+document.querySelectorAll('#sw2 .sw').forEach(e => e.onclick = () => { document.querySelectorAll('#sw2 .sw').forEach(x => x.classList.remove('on')); e.classList.add('on'); theme2 = e.dataset.t; });
+setInterval(() => fetch('/api/ping').catch(() => {}), 5000); fetch('/api/ping').catch(() => {});  // 告诉后台窗口还开着
+fetch('/api/info').then(r => r.json()).then(j => { if (!JOB) { JOB = j.running || new URLSearchParams(location.search).get('job'); if (JOB) watch(); } });  // 关了窗口又打开：接上正在生成的那条
+const drop = $('#drop');
+drop.onclick = () => $('#file').click();
+$('#file').onchange = e => setFile(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('on'); };
+drop.ondragleave = () => drop.classList.remove('on');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('on'); setFile(e.dataTransfer.files[0]); };
+const isVideo = f => /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name);
+function setFile(f) {
+  if (!f) return;
+  if (f.size > 2 * 1024 ** 3) { $('#fname').innerHTML = '<span class="err">文件有 ' + (f.size / 1073741824).toFixed(1) + 'GB，超过 2GB 上限。手机导出时选 1080P，或剪短一些再试。</span>'; $('#go').disabled = true; return; }
+  file = f; $('#fname').textContent = '已选择：' + f.name + '（' + (f.size / 1048576).toFixed(1) + ' MB）'; $('#go').disabled = false;
+  $('#prow').classList.toggle('hide', !isVideo(f)); updateMode();
+}
+function updateMode() {
+  const native = file && isVideo(file) && $('#keep').checked;
+  $('#themes').classList.toggle('hide', !!native);
+  $('#words').classList.toggle('hide', !native);
+}
+$('#keep').onchange = updateMode;
+$('#go').onclick = async () => {
+  $('#go').disabled = true; $('#fname').textContent = '正在读取文件…';
+  const r = await fetch(`/api/start?name=${encodeURIComponent(file.name)}&theme=${encodeURIComponent(theme)}&music=${$('#music').checked ? 1 : 0}&person=${isVideo(file) && $('#keep').checked ? 1 : 0}&focus=${encodeURIComponent($('#focus').value)}&trim=${$('#trim').checked ? 1 : 0}`, { method: 'POST', body: file });
+  const j = await r.json(); if (!r.ok) { $('#fname').textContent = j.err; $('#go').disabled = false; return; }
+  JOB = j.id; $('#fname').textContent = '已开始生成，进度见下方'; watch();
+};
+function watch() {
+  history.replaceState(null,'','?job='+encodeURIComponent(JOB));
+  t0 = Date.now(); $('#prog').classList.remove('hide'); $('#done').classList.add('hide'); $('#edit').classList.add('hide');
+  clearInterval(timer); timer = setInterval(poll, 1000); poll();
+}
+async function poll() {
+  const r = await fetch('/api/job?id=' + encodeURIComponent(JOB)); const s = await r.json();
+  if (!r.ok) { clearInterval(timer); $('#log').textContent = s.err; return; }
+  const STEPS = stepsOf(s), ix = STEPS.indexOf(s.step);
+  if (ix >= 0 || s.done) $('#steps').innerHTML = STEPS.map((x, i) => `<span class="${s.done || i < ix ? 'ok' : i === ix ? 'now' : ''}">${i + 1}. ${STEP_NAME[x]}</span>`).join('');
+  $('#bar').style.width = (s.pct || 0) + '%';
+  const sec = Math.round((Date.now() - t0) / 1000);
+  $('#eta').textContent = s.done ? '' : `已用时 ${mmss(sec)}` + (s.pct > 25 && s.pct < 90 ? `，预计还需 ${Math.max(1, Math.round(sec * (100 - s.pct) / s.pct / 60))} 分钟` : '') + '。可以去忙别的，但不要关闭这个窗口，也别让电脑睡眠，做完会自动显示在这里。';
+  $('#log').textContent = (s.log || []).slice(-6).join('\n');
+  if (s.err) { clearInterval(timer); $('#log').textContent += '\n生成失败：' + s.err + '\n详细错误信息已保存在出错记录.txt'; $('#go').disabled = false; return; }
+  if (s.done) { clearInterval(timer); show(s); }
+}
+function show(s) {
+  const u = n => `/out/${encodeURIComponent(JOB)}/${encodeURIComponent(n)}?v=${Date.now()}`;
+  $('#done').classList.remove('hide'); $('#edit').classList.remove('hide');
+  $('#vid').src = u('成片_竖屏.mp4'); $('#dl').href = u('成片_竖屏.mp4'); $('#dlsrt').href = u('字幕.srt');
+  $('#covers').innerHTML = `<figure><img src="${u('封面_3比4.png')}">3:4 封面 · <a href="${u('封面_3比4.png')}" download>下载</a></figure>`
+    + `<figure><img src="${u('封面_9比16.png')}">9:16 封面 · <a href="${u('封面_9比16.png')}" download>下载</a></figure>`;
+  $('#took').textContent = s.took ? `用时 ${mmss(s.took)}` : '';
+  const c = s.cut; $('#cutinfo').classList.toggle('hide', !c);
+  if (c) $('#cutinfo').innerHTML = `已自动剪掉 ${c.n} 处、共 ${c.sec} 秒：过长停顿 ${c['停顿']} 处，“嗯”“呃” ${c['语气词']} 处，说错重说 ${c['重说']} 处。`
+    + ` <a href="${u('剪掉的地方.txt')}" target="_blank">看剪了哪些</a>`;
+  $('#t1').value = (s.title || [])[0] || ''; $('#t2').value = (s.title || [])[1] || '';
+  originalLines = (s.lines || []).length;
+  $('#lines').value = (s.lines || []).join('\n'); $('#go').disabled = !file || false; $('#fname').textContent = file ? '换一条录音或视频，重新拖进来即可' : '';
+  document.querySelectorAll('#sw2 .sw').forEach(x => x.classList.toggle('on', x.dataset.t === (s.theme || '夜幕'))); theme2 = s.theme || '夜幕';
+  $('#prow2').classList.add('hide'); $('#keep2').checked = !!s.person;
+  $('#titleRow').classList.toggle('hide', !!s.person); $('#themes2').classList.toggle('hide', !!s.person); $('#words2').classList.toggle('hide', !s.person); $('#focus2').value=s.focus || '';
+  $('#crow').classList.toggle('hide', !s.person); $('#ct').value = s.cover_t != null ? s.cover_t : '';
+  lastMine = !!s.my_music;  // 上次怎么配的乐，这次默认照旧
+  document.querySelector(`input[name=m][value=${s.my_music ? 'mine' : s.music === false ? 'off' : 'on'}]`).checked = true;
+}
+$('#ctNow').onclick = () => { $('#ct').value = $('#vid').currentTime.toFixed(1); };
+$('#openDir').onclick = () => fetch('/api/open?id=' + encodeURIComponent(JOB), { method: 'POST' });
+$('#redo').onclick = async () => {
+  const m = document.querySelector('input[name=m]:checked').value;
+  const f = $('#bgmf').files[0];
+  if (m === 'mine' && !f && !lastMine) { $('#redoTip').textContent = '请先选择本地音乐文件'; return; }
+  if (m === 'mine' && f) {
+    await fetch(`/api/bgm?id=${encodeURIComponent(JOB)}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f }); }
+  const lines = $('#lines').value.split('\n');
+  if (lines.length !== originalLines || lines.some(x=>!x.trim())) { $('#redoTip').textContent='每行保留一句字幕，不能增删行或清空整行'; return; }
+  const r = await fetch('/api/redo?id=' + encodeURIComponent(JOB), { method: 'POST', body: JSON.stringify({ lines, focus: $('#focus2').value, title: [$('#t1').value, $('#t2').value], theme: theme2, music: m, person: $('#prow2').classList.contains('hide') ? undefined : $('#keep2').checked,
+    cover_t: $('#ct').value === '' ? undefined : +$('#ct').value }) });
+  const j = await r.json(); if (!r.ok) { $('#redoTip').textContent = j.err; return; }
+  JOB = j.id; watch();
+};
+</script></body></html>

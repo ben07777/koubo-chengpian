@@ -1,0 +1,10 @@
+/.venv/
+/runtime/
+/models/
+/出片/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db
+
