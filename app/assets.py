@@ -16,6 +16,50 @@ ASSETS = {
     "face_yunet.onnx": ("https://huggingface.co/opencv/opencv_zoo/resolve/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx","8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4")
 }
 
+def _ascii_bases():
+    out = []
+    for v in (os.environ.get("ProgramData"), os.environ.get("PUBLIC")):
+        if v:
+            out.append(Path(v) / "koubo-chengpian" / "models")
+    out.append(Path(ROOT.anchor) / "koubo-chengpian-models")
+    out.append(Path(tempfile.gettempdir()) / "koubo-chengpian-models")
+    return [p for p in out if str(p).isascii()]
+
+def local_path(name):
+    """给听写、找脸这两个底层库用的模型路径。软件所在路径全是英文就原样给；
+    带中文时（中文用户名的桌面、OneDrive 里的桌面），普通中文 Windows 上这两个库可能打不开文件，
+    先复制一份到不带中文的文件夹（第一次要几秒，以后直接用），复制不了再原样给。"""
+    src = ROOT / "models" / name
+    if str(src).isascii():
+        return str(src)
+    want = ASSETS.get(name, (None, None))[1]
+    for base in _ascii_bases():
+        dest = base / name
+        part = dest.with_name(dest.name + ".part")
+        mark = dest.with_name(dest.name + ".sha256")   # 复制成功时记下内容指纹；换了版本、模型同样大小也能认出来
+        try:
+            if dest.is_file() and dest.stat().st_size == src.stat().st_size and (not want or (mark.is_file() and mark.read_text(encoding="ascii").strip() == want)):
+                return str(dest)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if shutil.disk_usage(dest.parent).free < src.stat().st_size + (200 << 20):   # 留 200 MB 余量，不把这块盘写满
+                continue
+            shutil.copyfile(src, part)
+            if want and not matches(part, want):
+                part.unlink(missing_ok=True)
+                continue
+            os.replace(part, dest)
+            if want:
+                mark.write_text(want, encoding="ascii")
+            print("软件路径里有中文，模型复制到 " + str(base) + " 再读取。", flush=True)
+            return str(dest)
+        except OSError:   # 写到一半失败（盘满、没权限）：删掉半截文件再换下一个位置
+            try:
+                part.unlink(missing_ok=True)
+            except OSError:
+                pass
+            continue
+    return str(src)
+
 def matches(path, expected):
     if not path.is_file():
         return False

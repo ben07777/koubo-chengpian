@@ -4,6 +4,7 @@ import json, re, sys
 from pathlib import Path
 import wave
 import numpy as np, sherpa_onnx
+from assets import local_path
 
 ROOT = Path(__file__).resolve().parent.parent
 M = ROOT / 'models'
@@ -11,14 +12,14 @@ PUNCT = r"[，。！？、；：,.!?;:“”\"'（）()《》…—-]+"
 
 def transcribe(wav16k, threads=4):
     rec = sherpa_onnx.OfflineRecognizer.from_sense_voice(
-        model=str(M / 'sense-voice/model.int8.onnx'), tokens=str(M / 'sense-voice/tokens.txt'),
+        model=local_path('sense-voice/model.int8.onnx'), tokens=local_path('sense-voice/tokens.txt'),
         use_itn=True, language='zh', num_threads=threads)
     with wave.open(str(wav16k)) as w:
         sr, n, ch = w.getframerate(), w.getnframes(), w.getnchannels()
         x = np.frombuffer(w.readframes(n), dtype=np.int16).astype(np.float32) / 32768
     if ch > 1: x = x.reshape(-1, ch).mean(1)
     cfg = sherpa_onnx.VadModelConfig()
-    cfg.silero_vad.model = str(M / 'vad.onnx'); cfg.silero_vad.min_silence_duration = 0.25
+    cfg.silero_vad.model = local_path('vad.onnx'); cfg.silero_vad.min_silence_duration = 0.25
     cfg.silero_vad.threshold = 0.4; cfg.silero_vad.max_speech_duration = 8; cfg.sample_rate = sr
     vad = sherpa_onnx.VoiceActivityDetector(cfg, buffer_size_in_seconds=900)
     out = []

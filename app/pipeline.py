@@ -195,7 +195,7 @@ class Job:
 
 
 NAMES = dict(hook='开场大字', say='大字跳出', question='问号', cta='收尾印章', myth='误区卡', compare='前后对比', flip='划掉改写', pair='圆章并列',
-             range='区间条', stat='数字滚动', list='清单卡')
+             range='区间条', stat='数字滚动', list='清单卡', cause='因果箭头', year='年份时间线')
 
 
 if __name__ == '__main__':

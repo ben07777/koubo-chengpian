@@ -12,22 +12,22 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 #grid{background-image:radial-gradient(var(--dot) 2.2px,transparent 2.6px);background-size:54px 54px;opacity:.9}
 #grain{position:absolute;inset:0;background:repeating-linear-gradient(103deg,transparent 0 3px,#fff3 4px,transparent 5px);opacity:var(--grain);mix-blend-mode:overlay;pointer-events:none}
 #top{position:absolute;left:0;top:0;width:1080px;height:470px}
-#tag{position:absolute;left:70px;top:168px;font:44px Smiley;color:var(--accInk);background:var(--acc);padding:6px 24px 8px;border-radius:14px;white-space:nowrap}
-#ttl{position:absolute;left:70px;top:236px;width:940px;font:86px/1.13 Glow;letter-spacing:1px;color:var(--ink)}
+#tag{position:absolute;left:70px;top:232px;font:44px Smiley;color:var(--accInk);background:var(--acc);padding:6px 24px 8px;border-radius:14px;white-space:nowrap}
+#ttl{position:absolute;left:70px;top:300px;width:940px;font:86px/1.13 Glow;letter-spacing:1px;color:var(--ink)}
 #ttl .tl{display:block;white-space:nowrap}
 .hl{color:var(--acc);position:relative;display:inline-block}
-#prog{position:absolute;left:70px;top:456px;width:940px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+#prog{position:absolute;left:70px;top:520px;width:940px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 #prog i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:4px}
 #prog b{position:absolute;top:0;width:4px;height:8px;background:var(--bg0)}
 #stage{position:absolute;left:0;top:545px;width:1080px;height:800px;overflow:visible}
 #cam{position:absolute;inset:0;transform-origin:540px 400px}
 .scene{position:absolute;inset:0;display:none;transform-origin:540px 400px}
-#subs{position:absolute;left:60px;top:1372px;width:900px;height:150px;display:flex;align-items:center;justify-content:center}
-.sub{position:absolute;max-width:900px;text-align:center;font:800 62px/1.25 Noto;letter-spacing:1px;padding:8px 26px;border-radius:18px;background:var(--subBg);color:var(--subInk);-webkit-text-stroke:var(--subStroke);paint-order:stroke fill}
+#subs{position:absolute;left:60px;top:1372px;width:810px;height:150px;display:flex;align-items:center;justify-content:center}
+.sub{position:absolute;max-width:810px;white-space:nowrap;text-align:center;font:800 62px/1.25 Noto;letter-spacing:1px;padding:8px 26px;border-radius:18px;background:var(--subBg);color:var(--subInk);-webkit-text-stroke:var(--subStroke);paint-order:stroke fill}
 .sub span{display:inline-block}
 #sweep{position:absolute;left:-600px;top:545px;width:420px;height:800px;background:linear-gradient(100deg,transparent,var(--sweep),transparent);pointer-events:none;opacity:0}
 #flash{position:absolute;inset:0;background:var(--acc);opacity:0;pointer-events:none;mix-blend-mode:screen}
-.kin{position:absolute;left:90px;width:900px;text-align:center;font-family:Glow;color:var(--ink);transform-origin:50% 50%}
+.kin{position:absolute;left:90px;width:900px;text-align:center;text-wrap:balance;font-family:Glow;color:var(--ink);transform-origin:50% 50%}
 .kin span{display:inline-block;will-change:transform}
 .card{position:absolute;background:var(--card);border:3px solid var(--cardLine);border-radius:36px;box-shadow:var(--shadow)}
 .pill{position:absolute;display:flex;align-items:center;gap:12px;font:46px Smiley;padding:8px 26px 10px;border-radius:999px;white-space:nowrap;background:var(--card);border:3px solid var(--cardLine);color:var(--sub)}

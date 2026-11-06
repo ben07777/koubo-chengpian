@@ -39,7 +39,8 @@ def track(out, n):
     import cv2
     out = Path(out); first = _read(out / '00000.jpg'); ih, iw = first.shape[:2]
     sc = 320 / max(iw, ih); dw, dh = int(iw * sc), int(ih * sc)
-    det = cv2.FaceDetectorYN.create(str(FACE), '', (dw, dh), 0.6, 0.3, 50)
+    from assets import local_path
+    det = cv2.FaceDetectorYN.create(local_path('face_yunet.onnx'), '', (dw, dh), 0.6, 0.3, 50)
     raw, best, best_i = [], -1, n // 3
     for i in range(0, n, STEP):
         img = cv2.resize(_read(out / f'{i:05d}.jpg'), (dw, dh))

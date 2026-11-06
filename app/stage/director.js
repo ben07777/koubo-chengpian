@@ -20,9 +20,32 @@ const $ = s => document.querySelector(s);
 const CAM = $('#cam'), SUBS = $('#subs');
 const LN = PL.lines, SCN = [], SHAKES = [];
 const CY = 400;
+const KCY = 330;  // 大字中心：原 400，下沿会钻进右侧按钮列（画面 y≥1000），整体上提 70
+// 舞台坐标 y≥455（画面 y≥1000）的字，右缘不过 880：居中 540 时宽度不超过 680
+const SAFE_W = 640;  // 居中时右缘 860；镜头慢推 1.03 加晃动后仍在 880 以内
+const fitW = (s, size, w = SAFE_W) => Math.min(size, w / Math.max(1, ...String(plain(s)).split('\n').map(x => [...x].length)));
 const lineText = l => l.cs.map(c => c[0]).join('');
 const hl = s => String(s).replace(/\[\[(.+?)\]\]/g, '<span class="hl">$1</span>');
 const plain = s => String(s).replace(/\[\[|\]\]/g, '');
+// 结果句：一行放下时字号够大就一行；不够大就按 planner 给的词边界拆两行，字号按长的那行算
+const bigB = (sc, max, w) => {
+  const mk = s => sc.kw && s.includes(sc.kw) && sc.kw.length < sc.B.length ? s.replace(sc.kw, '[[' + sc.kw + ']]') : s;
+  const one = Math.min(max, fitW(sc.B, 999, w)), k = sc.Bcut;
+  if (k && one < max * 0.8) {
+    const a = sc.B.slice(0, k), b = sc.B.slice(k), two = Math.min(max, fitW(a + '\n' + b, 999, w));
+    if (two > one * 1.15) return { html: hl(mk(a)) + '<br>' + hl(mk(b)), size: two };
+  }
+  return { html: hl(mk(sc.B)), size: one };
+};
+// 一行只能缩成小字时，按 planner 给的词边界（cut）拆两行，字号按长的那行算
+const fit2 = (text, cut, max, w) => {
+  text = String(text); const one = Math.min(max, fitW(text, 999, w));
+  if (cut && !text.includes('\n') && one < max * 0.8) {
+    const a = text.slice(0, cut), b = text.slice(cut), two = Math.min(max, fitW(a + '\n' + b, 999, w));
+    if (two > one * 1.15) return { html: hl(a) + '<br>' + hl(b), size: two, lines: 2 };
+  }
+  return { html: hl(text).replace(/\n/g, '<br>'), size: one, lines: text.split('\n').length };
+};
 const kwMask = (cs, kw) => { const txt = cs.map(c => c[0]).join(''), ki = kw ? txt.indexOf(kw) : -1; let off = 0;
   return cs.map(c => { const a = off; off += c[0].length; return ki >= 0 && a < ki + kw.length && off > ki; }); };
 const clampN = (v, a, b) => Math.min(Math.max(v, a), b);
@@ -55,22 +78,31 @@ function kinLine(parent, li, size) {
 }
 function updChars(ch, t) {
   for (const c of ch) {
-    const k = P(t, c.t - 0.07, c.t + 0.2, E.outC), kb = P(t, c.t - 0.07, c.t + 0.32, E.outB);
+    const ct = c.tr != null ? c.tr : c.t;
+    const k = P(t, ct - 0.07, ct + 0.2, E.outC), kb = P(t, ct - 0.07, ct + 0.32, E.outB);
     set(c.e, { o: k, y: (1 - k) * 40, s: 1.3 - 0.3 * kb, b: (1 - k) * 7 });
-    if (c.kw) c.e.style.backgroundSize = (P(t, c.t + 0.08, c.t + 0.34, E.outC) * 100).toFixed(1) + '% 100%';
+    if (c.kw) c.e.style.backgroundSize = (P(t, ct + 0.08, ct + 0.34, E.outC) * 100).toFixed(1) + '% 100%';
   }
 }
-function KinStack(sc, cy, maxSize = 150) {
+function KinStack(sc, cy, maxSize = 150, opt = {}) {
   const blocks = [];
-  for (let li = sc.la; li < sc.lb; li++) blocks.push(kinLine(sc.el, li, Math.min(maxSize, kinSize(LN[li].cs.length))));
+  for (let li = sc.la; li < sc.lb; li++) blocks.push(kinLine(sc.el, li, Math.min(maxSize, kinSize(LN[li].cs.length), opt.w ? fitW(lineText(LN[li]), 999, opt.w) : 999)));
+  if (opt.w) blocks.forEach(b => Object.assign(b.box.style, { left: (opt.x != null ? opt.x : 540 - opt.w / 2) + 'px', width: opt.w + 'px' }));
+  if (opt.align) blocks.forEach(b => { b.box.style.textAlign = opt.align; });
+  const cap = sc.t1 - (sc.type === 'hook' ? 0.66 : 0.5);   // 退场开始前 0.2 秒，最后一个字要出完
+  blocks.forEach(b => {
+    const floor = Math.max(b.t0 - 0.45, Math.min(b.t0 - 0.08, cap - 0.045 * b.ch.length));
+    let nx = cap + 0.045; for (let i = b.ch.length - 1; i >= 0; i--) { const c = b.ch[i]; c.tr = Math.max(floor, Math.min(c.t, nx - 0.045)); nx = c.tr; }
+    b.ts = Math.min(b.t0, b.ch.length ? b.ch[0].tr + 0.08 : b.t0);
+  });
   sc.measure.push(() => blocks.forEach(b => { b.h = b.box.offsetHeight; b.box.style.top = (cy - b.h / 2) + 'px'; }));
   return {
     blocks,
     upd(t) {
       blocks.forEach((b, k) => {
-        if (t < b.t0 - 0.1) { b.box.style.opacity = 0; return; }
+        if (t < b.ts - 0.1) { b.box.style.opacity = 0; return; }
         const n1 = blocks[k + 1], n2 = blocks[k + 2];
-        const k1 = n1 ? P(t, n1.t0 - 0.12, n1.t0 + 0.3, E.outC) : 0, k2 = n2 ? P(t, n2.t0 - 0.12, n2.t0 + 0.3, E.outC) : 0;
+        const k1 = n1 ? P(t, n1.ts - 0.12, n1.ts + 0.3, E.outC) : 0, k2 = n2 ? P(t, n2.ts - 0.12, n2.ts + 0.3, E.outC) : 0;
         const up = k1 * (b.h * 0.29 + (n1 ? n1.h * 0.5 : 0) + 40) + k2 * (b.h * 0.2 + 120);
         set(b.box, { o: 1 - 0.62 * k1 - 0.38 * k2, y: -up, s: 1 - 0.42 * k1 - 0.1 * k2 });
         updChars(b.ch, t);
@@ -82,9 +114,9 @@ function KinStack(sc, cy, maxSize = 150) {
 // ---------- 各类镜头 ----------
 const BUILD = {
   hook(sc) {
-    const bgI = icon(sc.icon || 'sparkles', 560, sc.el, { position: 'absolute', left: '260px', top: '120px', opacity: .14, color: 'var(--acc)' });
+    const bgI = icon(sc.icon || 'sparkles', 560, sc.el, { position: 'absolute', left: '260px', top: '70px', opacity: .14, color: 'var(--acc)' });
     const dw = drawOn(bgI);
-    const ks = KinStack(sc, CY - 20, 150);
+    const ks = KinStack(sc, KCY - 20, 150);
     sc.noEnter = true; sc.noExit = true;
     return t => {
       const k = P(t, sc.t1 - 0.45, sc.t1 + 0.05, E.ioC);
@@ -94,10 +126,23 @@ const BUILD = {
     };
   },
   say(sc) {
-    const bgI = sc.icon ? icon(sc.icon, 470, sc.el, { position: 'absolute', left: '305px', top: '165px', opacity: .15, color: 'var(--acc)' }) : null;
-    const dw = bgI ? drawOn(bgI) : null;
-    const ks = KinStack(sc, CY);
     sc.hideSubs = true;
+    let v = sc.sayN % 3; if (v === 2 && !sc.icon) v = 1;
+    if (v === 1) {   // 左对齐 + 竖条：大字靠左排，左边一根色条随镜头长出来
+      const bar = abs(el('div', null, null, sc.el, { width: '14px', height: '230px', background: 'var(--acc)', borderRadius: '7px', transformOrigin: '50% 50%' }), 96, KCY - 115);
+      const ks = KinStack(sc, KCY, 128, { w: 740, x: 140, align: 'left' });
+      ks.blocks.forEach(b => { b.box.style.transformOrigin = '0 50%'; });
+      return t => { const kb = P(t, sc.t0, sc.t0 + 0.45, E.outB); set(bar, { o: kb > 0 ? 1 : 0, s: 1 }); bar.style.transform = `scaleY(${Math.max(0.001, kb).toFixed(4)})`; ks.upd(t); };
+    }
+    if (v === 2) {   // 居中 + 底部图标章：大字下面一枚实心圆章，图标一笔一笔画出来
+      const ks = KinStack(sc, KCY - 30);
+      const seal = abs(el('div', null, null, sc.el, { width: '150px', height: '150px', borderRadius: '50%', background: 'var(--acc)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 14px color-mix(in srgb, var(--acc) 16%, transparent)' }), 465, 440);
+      const ic = icon(sc.icon, 84, seal, { color: 'var(--accInk)' }); const dw = drawOn(ic);
+      return t => { const x = clamp((t - sc.t0 - 0.15) / 0.8); set(seal, { o: x > 0 ? 1 : 0, s: SP(x, 1.3, 5) || 0.001, y: Math.sin(t * 1.4) * 5 }); dw(P(t, sc.t0 + 0.25, sc.t0 + 1.1, E.ioC)); ks.upd(t); };
+    }
+    const bgI = sc.icon ? icon(sc.icon, 470, sc.el, { position: 'absolute', left: '305px', top: '115px', opacity: .15, color: 'var(--acc)' }) : null;
+    const dw = bgI ? drawOn(bgI) : null;
+    const ks = KinStack(sc, KCY);
     return t => {
       if (bgI) { set(bgI, { r: noise1(t * .3, 7) * 9, y: Math.sin(t * 1.1) * 14, s: 0.9 + 0.1 * P(t, sc.t0, sc.t0 + 1.0, E.outB), o: .15 }); dw(P(t, sc.t0 + 0.05, sc.t0 + 1.0, E.ioC)); }
       ks.upd(t);
@@ -105,7 +150,7 @@ const BUILD = {
   },
   question(sc) {
     const q = abs(el('div', 'big', '?', sc.el, { fontSize: '420px', lineHeight: 1, color: 'var(--acc)', width: '1080px', textAlign: 'center' }), 0, -40);
-    const ks = KinStack(sc, 590, 100);
+    const ks = KinStack(sc, 590, 100, { w: SAFE_W });
     sc.hideSubs = true;
     const t0 = LN[sc.la].t0;
     return t => {
@@ -135,33 +180,36 @@ const BUILD = {
     const pill = el('div', 'pill', '', sc.el); icon('users', 46, pill, { color: 'var(--sub)' }); el('span', null, sc.label, pill);
     abs(pill, 0, 30); pill.style.left = '50%'; pill.style.translate = '-50% 0';
     const card = abs(el('div', 'card', null, sc.el, { height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }), 100, 150, 880);
-    el('div', 'big', `“${sc.myth}”`, card, { fontSize: txtSize(sc.myth + '00', 96) + 'px', textAlign: 'center', padding: '0 50px', lineHeight: 1.2 });
-    const strike = abs(el('div', null, null, card, { height: '12px', background: 'var(--bad)', borderRadius: '6px', transformOrigin: '0 50%' }), 50, 154, 780);
-    const stamp = abs(el('div', 'stamp', '✕ 误区', sc.el), 620, 95);
-    const fact = abs(el('div', null, null, sc.el, { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '18px', font: `${txtSize(sc.fact + '000', 78)}px Glow`, color: 'var(--good)' }), 90, 540, 900);
-    icon('circle-check', 80, fact, { color: 'var(--good)' }); el('span', null, sc.factFull || ('其实：' + sc.fact), fact);
+    const mq = fit2('“' + sc.myth + '”', sc.mythCut ? sc.mythCut + 1 : null, Math.min(96, txtSize(sc.myth + '00', 96) * (sc.mythCut ? 1.5 : 1)), 780);
+    el('div', 'big', mq.html, card, { fontSize: mq.size + 'px', textAlign: 'center', padding: '0 50px', lineHeight: 1.2 });
+    const strikes = (mq.lines === 2 ? [154 - mq.size * 0.6, 154 + mq.size * 0.6] : [154]).map(y => abs(el('div', null, null, card, { height: '12px', background: 'var(--bad)', borderRadius: '6px', transformOrigin: '0 50%' }), 50, Math.round(y), 780));
+    const stamp = abs(el('div', 'stamp', '✕ 误区', sc.el), mq.lines === 2 ? 700 : 620, mq.lines === 2 ? 0 : 65), S0 = mq.lines === 2 ? 1.2 : 2.6, SB = mq.lines === 2 ? 0.8 : 1;   // 两行时砸下来别放那么大，不然冲进顶栏   // 原话两行时章贴到卡片上沿；一行时字放大了，章再往上 30，别擦到后引号
+    const factTxt = sc.factFull || ('其实：' + sc.fact);
+    const fact = abs(el('div', null, null, sc.el, { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '18px', font: `${Math.min(txtSize(sc.fact + '000', 78), fitW(factTxt, 99, SAFE_W - 98))}px Glow`, color: 'var(--good)' }), 90, 540, 900);
+    icon('circle-check', 80, fact, { color: 'var(--good)' }); el('span', null, factTxt, fact, { whiteSpace: 'nowrap' });
     SHAKES.push([sc.factT + 0.12, 16]);
     return t => {
       const kp = P(t, sc.t0, sc.t0 + 0.45, E.outB); pill.style.opacity = kp; pill.style.transform = `translateY(${(1 - kp) * 30}px)`;
       const kc = P(t, sc.mythT - 0.2, sc.mythT + 0.35, E.outB), kd = P(t, sc.factT, sc.factT + 0.35, E.outC);
       set(card, { o: kc * (1 - 0.45 * kd), y: (1 - kc) * 90, s: (0.94 + 0.06 * kc) * (1 - 0.03 * kd), r: -2 * kd });
-      strike.style.transform = `scaleX(${P(t, sc.factT, sc.factT + 0.3, E.outC)})`;
+      strikes.forEach((st, q) => { st.style.transform = `scaleX(${P(t, sc.factT + q * 0.12, sc.factT + 0.3 + q * 0.12, E.outC)})`; });
       const ks = P(t, sc.factT - 0.04, sc.factT + 0.26, E.outB2);
-      set(stamp, { o: t > sc.factT - 0.04 ? 1 : 0, s: 2.6 - 1.6 * ks, r: -14 + 4 * ks });
-      const kf = P(t, sc.factT + 0.25, sc.factT + 0.65, E.outC);
+      set(stamp, { o: t > sc.factT - 0.04 ? 1 : 0, s: SB * (S0 - (S0 - 1) * ks), r: -14 + 4 * ks });
+      const kf = P(t, sc.factT + 0.05, sc.factT + 0.35, E.outC);
       set(fact, { o: kf, y: (1 - kf) * 40 });
     };
   },
   compare(sc) {
     const mk = (side, top, h, hot) => {
-      const c = abs(el('div', 'card', null, sc.el, { height: h + 'px', padding: '30px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '18px' }), 100, top, 880);
+      const c = abs(el('div', 'card', null, sc.el, { height: h + 'px', padding: '30px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '18px' }), 100, top, 800);
       if (hot) Object.assign(c.style, { borderColor: 'var(--acc)', boxShadow: '0 0 0 6px color-mix(in srgb, var(--acc) 18%, transparent), var(--shadow)' });
       el('div', null, side.label, c, { font: '50px Smiley', color: hot ? 'var(--acc)' : 'var(--sub)' });
-      el('div', 'big', side.text.replace(/\n/g, '<br>'), c, { fontSize: txtSize(side.text, 84) + 'px', lineHeight: 1.18, color: hot ? 'var(--ink)' : 'var(--sub)' });
+      const ft = fit2(side.text, side.cut, 84, 700), fs = ft.lines === 2 && !hot ? Math.min(ft.size, 68) : ft.size;
+      el('div', 'big', ft.html, c, { fontSize: fs + 'px', lineHeight: 1.18, color: hot ? 'var(--ink)' : 'var(--sub)', whiteSpace: 'nowrap' });
       return c;
     };
     const A = mk(sc.L, 20, 300, false), B = mk(sc.R, 420, 360, true);
-    const arr = abs(el('div', null, '<svg viewBox="0 0 60 60" width="84" height="84"><path d="M30 6v44M12 32l18 18 18-18" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>', sc.el, { color: 'var(--acc)' }), 498, 330);
+    const arr = abs(el('div', null, '<svg viewBox="0 0 60 60" width="84" height="84"><path d="M30 6v44M12 32l18 18 18-18" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>', sc.el, { color: 'var(--acc)' }), 458, 330);
     return t => {
       const ka = P(t, sc.L.t - 0.2, sc.L.t + 0.3, E.outB), kb = P(t, sc.R.t - 0.2, sc.R.t + 0.35, E.outB);
       set(A, { o: ka * (1 - 0.4 * kb), x: (1 - ka) * -140, s: 1 - 0.04 * kb });
@@ -179,8 +227,8 @@ const BUILD = {
     const bw = abs(el('div', null, null, sc.el, { textAlign: 'center' }), 60, 430, 960);
     el('div', null, sc.bLabel, bw, { display: 'inline-block', font: '58px Smiley', color: 'var(--accInk)', background: 'var(--acc)', padding: '4px 28px 10px', borderRadius: '16px', marginBottom: '20px' });
     el('br', null, null, bw);
-    const kwB = sc.kw && sc.B.includes(sc.kw) && sc.kw.length < sc.B.length ? sc.B.replace(sc.kw, '[[' + sc.kw + ']]') : sc.B;
-    el('span', 'big', hl(kwB), bw, { display: 'inline-block', fontSize: txtSize(sc.B, 128) + 'px', lineHeight: 1.12 });
+    const bb = bigB(sc, 128, 590);
+    el('span', 'big', bb.html, bw, { display: 'inline-block', fontSize: bb.size + 'px', lineHeight: 1.12, whiteSpace: 'nowrap' });
     SHAKES.push([sc.tB + 0.1, 14]);
     return t => {
       const k0 = P(t, sc.t0, sc.t0 + 0.4, E.outC); set(hd, { o: k0, y: (1 - k0) * 30 });
@@ -191,18 +239,89 @@ const BUILD = {
       set(bw, { o: P(t, sc.tB - 0.05, sc.tB + 0.08), s: (1.45 - 0.45 * kb) * (1 + 0.025 * Math.sin(Math.max(0, t - sc.tB - 0.3) * 2.2)), y: (1 - kb) * -40 });
     };
   },
+  cause(sc) {   // 因为 A → 所以 B：上面一张小卡写原因，箭头一笔画下来，结果砸在下面
+    sc.hideSubs = true;
+    const ca = abs(el('div', 'card', null, sc.el, { padding: '26px 40px', display: 'flex', alignItems: 'center', gap: '24px' }), 100, 30, 800);
+    el('div', null, sc.aLabel, ca, { font: '50px Smiley', color: 'var(--bg0)', background: 'var(--sub)', padding: '2px 22px 8px', borderRadius: '14px', flex: 'none' });
+    const fa = fit2(sc.A, sc.Acut, 76, 560);
+    el('div', 'big', fa.html, ca, { fontSize: fa.size + 'px', color: 'var(--sub)', whiteSpace: 'nowrap', lineHeight: 1.15 });
+    const arr = abs(el('div', null, '<svg viewBox="0 0 120 220" width="120" height="220" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M60 8 V198"/><path d="M22 160 L60 204 L98 160"/></svg>', sc.el, { color: 'var(--acc)' }), 480, 215);
+    const dw = drawOn(arr);
+    const chip = abs(el('div', null, sc.bLabel, sc.el, { font: '54px Smiley', color: 'var(--accInk)', background: 'var(--acc)', padding: '2px 26px 8px', borderRadius: '14px', whiteSpace: 'nowrap' }), 630, 275);
+    const bw = abs(el('div', null, null, sc.el, { textAlign: 'center' }), 0, 455, 1080);
+    const bb = bigB(sc, 124, 590);
+    el('span', 'big', bb.html, bw, { display: 'inline-block', fontSize: bb.size + 'px', lineHeight: 1.12, whiteSpace: 'nowrap' });
+    SHAKES.push([sc.tB + 0.12, 12]);
+    return t => {
+      const ka = P(t, sc.tA - 0.25, sc.tA + 0.3, E.outB); set(ca, { o: ka * (1 - 0.35 * P(t, sc.tB, sc.tB + 0.3)), y: (1 - ka) * -60 });
+      dw(P(t, sc.tB - 0.55, sc.tB - 0.05, E.ioC));
+      const kc = P(t, sc.tB - 0.3, sc.tB + 0.05, E.outB); set(chip, { o: kc, s: 0.6 + 0.4 * kc });
+      const kb = P(t, sc.tB - 0.02, sc.tB + 0.32, E.outB2);
+      set(bw, { o: P(t, sc.tB - 0.05, sc.tB + 0.08), s: 1.35 - 0.35 * kb, y: (1 - kb) * -40 });
+    };
+  },
+  year(sc) {   // 年份：一个就大字翻到位；两三个就竖排时间线，说到哪个点亮哪个
+    const N = sc.nodes.length;
+    const roll = (e, y, k) => { e.firstChild.textContent = String(Math.round(+y - (1 - k) * 15)); };
+    const yearEl = (y, size) => { const e = el('div', 'num', null, sc.el, { fontSize: size + 'px', color: 'var(--acc)', whiteSpace: 'nowrap', letterSpacing: '-3px' }); el('span', null, y, e); el('span', 'big', '年', e, { fontSize: '.42em', marginLeft: '10px', letterSpacing: '0' }); return e; };
+    if (N === 1) {
+      const nd = sc.nodes[0];
+      const bgI = icon('calendar', 520, sc.el, { position: 'absolute', left: '280px', top: '20px', opacity: .12, color: 'var(--acc)' }); const dw = drawOn(bgI);
+      const yr = abs(yearEl(nd.year, 250), 0, 110); Object.assign(yr.style, { width: '1080px', textAlign: 'center' });
+      const ln = abs(el('div', null, null, sc.el, { height: '10px', background: 'var(--acc)', borderRadius: '5px' }), 290, 395, 500);
+      const tx = abs(el('div', 'big', nd.text, sc.el, { fontSize: Math.min(92, fitW(nd.text, 99)) + 'px', textAlign: 'center', whiteSpace: 'nowrap' }), 0, 440, 1080);
+      SHAKES.push([nd.t + 0.2, 10]);
+      return t => {
+        dw(P(t, sc.t0, sc.t0 + 1.0, E.ioC)); set(bgI, { r: noise1(t * .3, 3) * 6, o: .12 });
+        const k = P(t, nd.t - 0.45, nd.t + 0.2, E.outC); roll(yr, nd.year, k); set(yr, { o: P(t, nd.t - 0.45, nd.t - 0.25), s: 0.85 + 0.15 * P(t, nd.t - 0.1, nd.t + 0.3, E.outB) });
+        ln.style.transform = `scaleX(${P(t, nd.t + 0.05, nd.t + 0.45, E.outC).toFixed(4)})`;
+        const kt = P(t, nd.t + 0.25, nd.t + 0.65, E.outC); set(tx, { o: kt, y: (1 - kt) * 36 });
+      };
+    }
+    const X0 = 170, top0 = N === 2 ? 60 : 20, gap = N === 2 ? 330 : 245;
+    const rail = abs(el('div', null, null, sc.el, { width: '8px', height: ((N - 1) * gap) + 'px', background: 'var(--line)', borderRadius: '4px' }), X0 - 4, top0 + 60);
+    const fill = abs(el('div', null, null, sc.el, { width: '8px', height: ((N - 1) * gap) + 'px', background: 'var(--acc)', borderRadius: '4px', transformOrigin: '50% 0' }), X0 - 4, top0 + 60);
+    const its = sc.nodes.map((nd, k) => {
+      const y = top0 + k * gap;
+      const dot = abs(el('div', null, null, sc.el, { width: '44px', height: '44px', borderRadius: '50%', background: 'var(--acc)', boxShadow: '0 0 0 10px color-mix(in srgb, var(--acc) 22%, transparent)' }), X0 - 22, y + 38);
+      const yr = abs(yearEl(nd.year, 116), X0 + 60, y);
+      const tx = nd.text ? abs(el('div', 'big', nd.text, sc.el, { fontSize: Math.min(68, fitW(nd.text, 99, 620)) + 'px', whiteSpace: 'nowrap', color: 'var(--ink)' }), X0 + 64, y + 128) : null;
+      return { nd, dot, yr, tx };
+    });
+    return t => {
+      let cur = -1; its.forEach((it, k) => { if (t >= it.nd.t - 0.2) cur = k; });
+      its.forEach((it, k) => {
+        const x = clamp((t - it.nd.t + 0.25) / 0.7), dim = k < cur ? 0.5 : 1;
+        set(it.dot, { o: x > 0 ? 1 : 0, s: SP(x, 1.4, 5) || 0.001 });
+        const ky = P(t, it.nd.t - 0.3, it.nd.t + 0.2, E.outC); roll(it.yr, it.nd.year, ky); set(it.yr, { o: ky * dim, x: (1 - ky) * 80 });
+        if (it.tx) { const kt = P(t, it.nd.t + 0.15, it.nd.t + 0.55, E.outC); set(it.tx, { o: kt * dim, x: (1 - kt) * 60 }); }
+      });
+      const a = its[0].nd.t, b = its[N - 1].nd.t;
+      let f = 0; for (let k = 1; k < N; k++) f += P(t, its[k - 1].nd.t + 0.1, its[k].nd.t - 0.1, E.ioC) / (N - 1);
+      fill.style.transform = `scaleY(${Math.max(0.001, f).toFixed(4)})`; set(rail, { o: P(t, a - 0.3, a) });
+    };
+  },
   pair(sc) {
-    const N = sc.items.length, D = N === 2 ? 300 : N === 3 ? 240 : 196, gap = N === 2 ? 150 : 70;
+    const N = sc.items.length, grid = N >= 4, cols = grid ? 2 : N;
+    const D = N === 2 ? 260 : N === 3 ? 180 : 160, gap = N === 2 ? 110 : N === 3 ? 40 : 160, TW = N === 2 ? 250 : N === 3 ? 180 : 300;
+    if (grid) sc.hideSubs = true;   // 两行排满了，字幕会压在第二行字上
     const ttl = abs(el('div', 'big', sc.title, sc.el, { fontSize: txtSize(sc.title, 96) + 'px', textAlign: 'center' }), 90, 40, 900);
-    const W0 = N * D + (N - 1) * gap, x0 = 540 - W0 / 2;
+    const W0 = cols * D + (cols - 1) * gap, x0 = 540 - W0 / 2, Y0 = grid ? 210 : 250;
     const its = sc.items.map((it, k) => {
-      const g = abs(el('div', null, null, sc.el, { width: D + 'px', textAlign: 'center' }), x0 + k * (D + gap), 250);
+      const col = grid ? k % 2 : k, row = grid ? (k / 2) | 0 : 0;
+      const g = abs(el('div', null, null, sc.el, { width: D + 'px', textAlign: 'center' }), x0 + col * (D + gap), Y0 + row * 300);
       const c = el('div', 'card', null, g, { position: 'relative', width: D + 'px', height: D + 'px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', borderColor: 'var(--acc)', borderWidth: '6px' });
       icon(it.icon || 'circle-check', D * 0.46, c, { color: k % 2 ? 'var(--acc2)' : 'var(--acc)' });
-      el('div', 'big', it.text, g, { fontSize: (it.text.length <= 3 ? 92 : 70) + 'px', marginTop: '26px', whiteSpace: 'nowrap', marginLeft: '-60px', marginRight: '-60px' });
+      const n = [...it.text].length, two = n >= 4 && fitW(it.text, 99, TW) < 64;
+      const fz = two ? Math.min(80, TW / Math.ceil(n / 2)) : Math.min(n <= 3 ? 92 : 70, fitW(it.text, 99, TW));
+      const tx = two ? it.text.slice(0, Math.ceil(n / 2)) + '<br>' + it.text.slice(Math.ceil(n / 2)) : it.text;
+      el('div', 'big', tx, g, { fontSize: fz + 'px', lineHeight: 1.1, marginTop: '22px', whiteSpace: 'nowrap', width: TW + 'px', marginLeft: ((D - TW) / 2) + 'px' });
       return { g, t: it.t };
     });
-    const plus = sc.items.slice(1).map((_, k) => abs(el('div', 'num', '+', sc.el, { fontSize: '110px', color: 'var(--sub)', width: gap + 'px', textAlign: 'center' }), x0 + (k + 1) * (D + gap) - gap, 250 + D / 2 - 66));
+    // 最后一项常在句尾才说到：每项最晚在退场前 0.45 秒站稳（复测：三件事的「快充」、四件事的「费用」刚冒出来就退场）
+    its.forEach((o, k) => { o.t = Math.max(sc.t0 + 0.15 * k, Math.min(o.t, sc.t1 - 1.03 - (its.length - 1 - k) * 0.15)); });
+    const PF = N === 2 ? 110 : 70;
+    const plus = grid ? [] : sc.items.slice(1).map((_, k) => abs(el('div', 'num', '+', sc.el, { fontSize: PF + 'px', color: 'var(--sub)', width: gap + 'px', textAlign: 'center' }), x0 + (k + 1) * (D + gap) - gap, Y0 + D / 2 - PF * 0.6));
     return t => {
       const k0 = P(t, sc.t0, sc.t0 + 0.4, E.outC); set(ttl, { o: k0, y: (1 - k0) * 30 });
       its.forEach((it, k) => {
@@ -213,7 +332,7 @@ const BUILD = {
     };
   },
   range(sc) {
-    const max = sc.max || 100, BW = 820, X = 110, Y = 400, BH = 150;
+    const max = sc.max || 100, BW = 700, X = 100, Y = 400, BH = 150;
     const ttl = abs(el('div', 'big', sc.label, sc.el, { fontSize: txtSize(sc.label, 92) + 'px', textAlign: 'center' }), 90, 40, 900);
     const bar = abs(el('div', null, null, sc.el, { height: BH + 'px', borderRadius: '30px', border: '8px solid var(--ink)', background: 'var(--card)', overflow: 'hidden' }), X, Y, BW);
     const nub = /battery/.test(sc.icon || '') || /电/.test(sc.label) ? abs(el('div', null, null, sc.el, { width: '30px', height: '70px', borderRadius: '0 14px 14px 0', background: 'var(--ink)' }), X + BW, Y + BH / 2 - 35) : null;
@@ -245,15 +364,16 @@ const BUILD = {
     const grp = (label, value, unit, y) => {
       const g = abs(el('div', null, null, sc.el, { textAlign: 'center' }), 90, y, 900);
       const lb = el('div', 'big', label, g, { fontSize: txtSize(label, 88) + 'px', minHeight: '20px' });
-      const row = el('div', null, null, g, { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '12px', marginTop: '6px', color: col });
-      const nm = el('div', 'num', '0', row, { fontSize: (String(value).length > 4 ? 220 : 290) + 'px' });
-      el('div', 'big', unit === '%' ? '%' : unit, row, { fontSize: '140px' });
+      const row = el('div', null, null, g, { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '12px', marginTop: '6px', color: col, lineHeight: 1 });
+      const nd = String(fmtN(value)).length, nsz = nd <= 2 ? 290 : nd === 3 ? 260 : nd === 4 ? 225 : 185;
+      const nm = el('div', 'num', '0', row, { fontSize: nsz + 'px' });
+      el('div', 'big', unit === '%' ? '%' : unit, row, { fontSize: Math.round(nsz * 0.48) + 'px', lineHeight: 1 });
       let barF = null;
       if (unit === '%') { const b = el('div', null, null, g, { margin: '18px auto 0', width: '720px', height: '28px', borderRadius: '14px', background: 'var(--line)', overflow: 'hidden' }); barF = el('div', null, null, b, { height: '100%', width: '0', background: col, borderRadius: '14px' }); }
       return { g, nm, barF, value };
     };
-    const G1 = grp(sc.label, sc.value, sc.unit, 90);
-    const G2 = sc.second ? grp(sc.second.label, sc.second.value, sc.second.unit, 90) : null;
+    const G1 = grp(sc.label, sc.value, sc.unit, 40);
+    const G2 = sc.second ? grp(sc.second.label, sc.second.value, sc.second.unit, 40) : null;
     const warn = sc.tone === 'bad' ? icon('triangle-alert', 120, sc.el, { position: 'absolute', left: '840px', top: '210px', color: 'var(--bad)' }) : null;
     const ring = abs(el('div', null, null, sc.el, { width: '620px', height: '620px', borderRadius: '50%', border: `6px solid ${col}` }), 230, 110);
     SHAKES.push([sc.t + 0.6, sc.tone === 'bad' ? 14 : 8]);
@@ -274,10 +394,12 @@ const BUILD = {
     const badge = el('div', 'num', String(N), hd, { width: '118px', height: '118px', borderRadius: '50%', background: 'var(--acc)', color: 'var(--accInk)', fontSize: '76px', display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '0' });
     el('div', 'big', sc.title.replace(/^[^一-龥]*/, ''), hd, { fontSize: txtSize(sc.title, 92) + 'px' });
     const cards = sc.items.map((it, k) => {
-      const c = abs(el('div', 'card', null, sc.el, { height: ch + 'px', display: 'flex', alignItems: 'center', gap: '26px', padding: '0 40px' }), 100, top0 + k * sp, 860);
+      const c = abs(el('div', 'card', null, sc.el, { height: ch + 'px', display: 'flex', alignItems: 'center', gap: '26px', padding: '0 40px' }), 100, top0 + k * sp, 780);
       el('div', 'num', String(k + 1).padStart(2, '0'), c, { fontSize: '64px', color: 'var(--acc)', letterSpacing: '-2px', minWidth: '84px' });
       if (it.icon) icon(it.icon, 64, c, { color: 'var(--ink)', flex: 'none' });
-      el('div', 'big', it.head, c, { fontSize: (it.head.length > 10 ? 54 : 64) + 'px', whiteSpace: 'nowrap' });
+      const W = it.icon ? 490 : 580, one = Math.min(64, fitW(it.head, 99, W)), fh = fit2(it.head, it.cut, 64, W);
+      const two = fh.lines === 2 ? Math.min(fh.size, Math.floor((ch - 12) / 2.3)) : 0, useTwo = two > one;   // 五项时卡片矮，拆两行反而更小，就不拆
+      el('div', 'big', useTwo ? fh.html : it.head, c, { fontSize: (useTwo ? two : one) + 'px', whiteSpace: 'nowrap', lineHeight: 1.1 });
       return { c, t: it.t };
     });
     return t => {
@@ -312,7 +434,7 @@ function build() {
 
   // 镜头
   for (const s of PL.scenes) {
-    const sc = Object.assign({}, s, { el: el('div', 'scene', null, CAM), measure: [], idx: SCN.length });
+    const sc = Object.assign({}, s, { el: el('div', 'scene', null, CAM), measure: [], idx: SCN.length, sayN: SCN.filter(x => x.type === 'say').length });
     if (!SCN.length) sc.noEnter = true;  // 第一帧就要有东西，不从透明淡进
     sc.upd = (BUILD[s.type] || BUILD.say)(sc);
     SCN.push(sc);
@@ -322,7 +444,7 @@ function build() {
   // 字幕
   const SUB = LN.map(l => {
     const d = el('div', 'sub', null, SUBS, { display: 'none' });
-    if (l.cs.length > 13) d.style.fontSize = '54px';
+    { const n = lineText(l).length; if (n > 12) d.style.fontSize = Math.floor(752 / n) + 'px'; }
     const m = kwMask(l.cs, l.kw || '');
     const ch = l.cs.map((c, i) => ({ e: el('span', null, c[0], d), t: c[1], kw: m[i] }));
     return { d, ch, l };
@@ -336,7 +458,7 @@ function build() {
   $('#bg').style.background = `linear-gradient(180deg, ${TH.bg1} 0%, ${TH.bg0} 55%, ${TH.bg0} 100%)`;
 
   // 真人画面：平时人占满屏；说到数字、清单、对比这些，人缩到上半屏，卡片在下半屏出
-  const SPLIT = new Set(['myth', 'compare', 'pair', 'range', 'stat', 'list']), SH = 900;  // 只有带数据的卡才分屏；问号、收尾留给人
+  const SPLIT = new Set(['myth', 'compare', 'pair', 'range', 'stat', 'list', 'cause', 'year']), SH = 900;  // 只有带数据的卡才分屏；问号、收尾留给人
   const segs = [];
   if (PS && !PLAIN) for (const s of PL.scenes) if (SPLIT.has(s.type)) {
     const L = segs[segs.length - 1];

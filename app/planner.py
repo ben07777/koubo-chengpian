@@ -2,7 +2,8 @@
 # 不联网、不用钥匙：靠中文口播里的常见信号判断画面——
 #   数字 → 滚数；A 到 B → 区间条；第一第二第三 → 清单卡；很多人以为…其实 → 误区卡；
 #   以前…现在 / 不是…而是 / A，B 却… → 对比两栏；不是A，就是B（分两句说）→ 划掉改写；
-#   两件事：A 和 B → 圆章；问句 → 问号；其余 → 大字逐字跳。
+#   两件事：A 和 B → 圆章；因为 A / 所以 B → 因果箭头；2019 年 … 2023 年 → 年份时间线；
+#   问句 → 问号；其余 → 大字逐字跳（三种版式轮换）。
 import math
 import re
 from difflib import SequenceMatcher
@@ -36,6 +37,19 @@ FLIP_A = re.compile(r'^(.{0,8}?)不是(.{1,5})$')                  # 「很多�
 FLIP_B = re.compile(r'^(而是|就是|反而是|只是|是)(.{2,11})$')       # 「就是被这个东西拖垮的」
 EITHER_RE = re.compile(r'(天天|每天|总是|老是|整天|成天|一天到晚|要么|平时|经常)')  # 「天天不是喝酒 / 就是打牌」是二选一，不是改正
 BUT_RE = re.compile(r'.{1,6}(?<![冷忘推了退])却.{1,6}')            # 「手里却没钱」；冷却、忘却这类不算
+YEAR_RE = re.compile(r'((?:19|20)\d{2})\s*年(?![代级纪报度终初底末]|中报|中期)')   # 「2019年」；「90年代」「2024年报」「年度」「年终奖」「年底」不算
+CN_YEAR_RE = re.compile(r'([一二][零〇一二三四五六七八九]{3})年')       # 听写偶尔写成「二零一九年」
+CN_DIGIT = dict(zip('零〇一二三四五六七八九', '00123456789'))
+CAUSE_ONE = re.compile(r'^(.{0,4}?)(因为|由于)(.{2,10}?)[，,]?(所以|因此|于是)(.{2,10})$')   # 一句话说完：因为便宜，所以卖得快
+CAUSE_A = re.compile(r'^(.{0,4}?)(因为|由于)(.{3,13})$')                                   # 分两句说：因为它要等客户付款
+CAUSE_B = re.compile(r'^(所以|因此|于是|结果(?!出来|出|显示|是|怎么|呢)|这就导致|导致)(.{3,13})$')   # 「结果出来以后再说」的结果是名词                     #           所以账上没钱
+def dur_before(s, i):   # 「有2000年的历史」「近2000年」「过去2000年」是时长；「熬过了2008年」「到了2023年」是时间点
+    return s[i - 1:i] in ('有', '近', '约') or s[max(0, i - 2):i] == '过去'
+CAUSE_BAD = ('说', '呢', '啊', '吧', '嘛', '呀', '的话')   # 「所以说啊」是口头禅，不是结果
+CAUSE_CHAT = re.compile(r'(问我|私信|留言|催更|今天.{0,4}(聊|讲|说|出一期)|长话短说|下期再|篇幅|时间(有限|关系))')   # 开场、收尾的套话
+def cause_weak(b):   # 结果半句只是「你看啊」「我觉得吧」「接下来我讲讲」这类过渡话，不画箭头；「所以公司倒了啊」照画
+    b = re.sub('[啊吧呢嘛呀]+$', '', str(b))
+    return len(b) < 2 or re.fullmatch('(你看|我觉得|我跟你说|就是说|也就是说)', b) is not None or re.match('(接下来|下面|那|今天)?(我们|我)?(就|来)?(讲讲|讲一讲|说说|说一说|聊聊|聊一聊|给大家讲|跟大家聊|跟大家说)', b) is not None
 Q_RE = re.compile(r'([?？]$|为什么|为啥|怎么办|怎么|是不是|能不能|要不要|吗$|呢$|多少)')
 CTA_RE = re.compile(r'(今天就|现在就|赶紧|记得|试试|去做|去试|收藏|下次|马上)')
 FILLER = re.compile(r'^(所以|那么|然后|而且|并且|另外|还有|就是|其实|好|那|嗯|呃|啊)[，,。\s]*')
@@ -68,6 +82,7 @@ def icon_for(text, default=None):
 
 
 def normalize_text(s):
+    s = CN_YEAR_RE.sub(lambda m: (lambda d: d + '年' if d[:2] in ('19', '20') else m.group(0))(''.join(CN_DIGIT[c] for c in m.group(1))), s)
     s = s.replace('百分之百', '100%')
     s = re.sub(r'百分之([一二三四五六七八九十]+)', lambda m: f'{cn2num(m.group(1))}%', s)
     return s
@@ -251,6 +266,42 @@ def plan(lines, dur, title=None, theme='night', tag=None):
         return (k + 1 < n and BUT_RE.fullmatch(T[k + 1]) is not None and 3 <= len(T[k]) <= 14
                 and '却' not in T[k] and not NUM_RE.search(T[k] + T[k + 1]) and not MYTH_RE.search(T[k]))
 
+    def cause_at(k):  # 「因为它要等客户付款 / 所以账上没钱」→ (A, B, A 起点, B 起点, 连接词, 结束行)
+        s = T[k]
+        if Q_RE.search(s) or re.search(r'\d', s) or MYTH_RE.search(s) or CAUSE_CHAT.search(s + (T[k + 1] if k + 1 < n else '')):
+            return None
+        m = CAUSE_ONE.match(s)
+        if m and not m.group(5).startswith(CAUSE_BAD) and len(clean(m.group(3))) >= 2 and not cause_weak(m.group(5)):
+            return clean(m.group(3)), clean(m.group(5)), char_time(lines, k, m.group(3)), char_time(lines, k, m.group(4)), m.group(2), m.group(4), k + 1
+        if k + 1 < n:
+            ma, mb = CAUSE_A.match(s), CAUSE_B.match(T[k + 1])
+            if ma and mb and not Q_RE.search(T[k + 1]) and not re.search(r'\d', T[k + 1]) and not mb.group(2).startswith(CAUSE_BAD) and not cause_weak(mb.group(2)):
+                return clean(ma.group(3)), clean(mb.group(2)), char_time(lines, k, ma.group(3)), lines[k + 1]['t0'], ma.group(2), mb.group(1), k + 2
+        return None
+
+    def try_years(i):  # 「2019年我开始做自媒体 / 到了2023年……」→ 一到三个年份节点
+        if not any(not dur_before(T[i], m.start()) for m in YEAR_RE.finditer(T[i])):
+            return None
+        nodes, k = [], i
+        while k < n and len(nodes) < 3:
+            ms = [m for m in YEAR_RE.finditer(T[k]) if not dur_before(T[k], m.start())]
+            if not ms or (nodes and ms[0].group(1) == nodes[-1]['year']):
+                break
+            end = k + 1
+            for q, m in enumerate(ms[:3 - len(nodes)]):
+                seg = T[k][m.end():ms[q + 1].start()] if q + 1 < len(ms) else T[k][m.end():]
+                txt = clean(re.sub(r'^(的时候|那年|时|的|到|至|开始|说起|以来|以后|之后|起|，|,)+', '', seg))
+                if len(txt) < 2 and q == 0 and len(ms) == 1:
+                    txt = clean(re.sub(r'^(在|到了|从|是|早在|直到|等到)', '', strip_filler(T[k][:m.start()])))
+                if len(txt) < 2 and q == len(ms) - 1 and end < n and not is_cue(end) and not YEAR_RE.search(T[end]) and len(T[end]) <= 12:
+                    txt = T[end]; end += 1
+                if (len(txt) < 2 and len(ms) == 1) or re.search('[从到在得]$', txt):   # 「这事得从 2008 年说起」：剩下的字说不成一句，不做这个节点；「从2008年到2015年」前一个年份不配字也留着
+                    continue
+                nodes.append(dict(year=m.group(1), text=txt[:12], t=char_time(lines, k, m.group(1), after=m.start())))
+            if not nodes: return None
+            k = end
+        return (k, nodes) if nodes and k > i else None
+
     m0 = MYTH_RE.search(T[0]) if n >= 2 else None
     m0 = m0 if m0 and re.search('(以为|觉得|认为)$', m0.group(0)) else None
     jf = next((k for k in range(1, min(4, n)) if FACT_RE.match(T[k])), None) if m0 else None
@@ -260,7 +311,8 @@ def plan(lines, dur, title=None, theme='night', tag=None):
             tl = [clean(m0.group(0)), rest0]          # 软件自己起的标题：「很多人以为 / 合同一签钱就到手了」，不吃「其实不是」那行
         fact = strip_fact(T[jf]) or T[jf]
         add('myth', 0, jf + 1, label=clean(MYTH_RE.search(T[0]).group(0)), myth=rest0, mythT=lines[0]['t0'],
-            fact=fact, factFull=T[jf] if len(fact) <= 3 else '', factT=lines[jf]['t0'], icon=icon_for(''.join(T[:jf + 1]), 'sparkles'))
+            fact=fact, factFull=T[jf] if len(fact) <= 3 else '', factT=lines[jf]['t0'], icon=icon_for(''.join(T[:jf + 1]), 'sparkles'),
+            mythCut=b_cut(rest0))
         i = jf + 1
     else:
         add('hook', 0, hook_end, icon=icon_for(''.join(T[:hook_end]), 'sparkles'))
@@ -311,6 +363,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
             ma, mb = FLIP_A.match(s), FLIP_B.match(T[i + 1])
             add('flip', lead, i + 2, head=clean(ma.group(1)) + '不是', A=clean(ma.group(2)), tA=char_time(lines, i, ma.group(2)),
                 bLabel=mb.group(1), B=clean(mb.group(2)), tB=lines[i + 1]['t0'], kw=find_kw(mb.group(2)))
+            scenes[-1]['Bcut'] = b_cut(scenes[-1]['B'], scenes[-1]['kw'])
             i += 2; continue
         if but_at(i):
             add('compare', lead, i + 2, L=dict(label='看上去', text=clean(strip_filler(s)), t=lines[i]['t0']),
@@ -321,12 +374,25 @@ def plan(lines, dur, title=None, theme='night', tag=None):
             add('compare', lead, i + 1, L=dict(label='不是', text=clean(m.group(1)), t=lines[i]['t0'], icon='circle-x'),
                 R=dict(label='而是', text=clean(m.group(2)), t=char_time(lines, i, '而是'), icon='circle-check'))
             i += 1; continue
+        # 年份：2019 年 … 2023 年（年份不滚数，也不当区间）
+        yr = try_years(i)
+        if yr:
+            j, nodes = yr
+            add('year', lead, j, nodes=nodes)
+            i = j; continue
+        # 因果：因为 A，所以 B
+        ca = cause_at(i)
+        if ca:
+            A, B, tA, tB, la_, lb_, j = ca
+            add('cause', lead, j, A=A, B=B, tA=tA, tB=tB, aLabel=la_, bLabel=lb_, kw=find_kw(B), icon=icon_for(A + B))
+            scenes[-1]['Bcut'] = b_cut(B, scenes[-1]['kw']); scenes[-1]['Acut'] = b_cut(A)
+            i = j; continue
         # 区间：20% 到 80%
         m = RANGE_RE.search(s)
         if m and (m.group(2) or m.group(4)):
             unit = m.group(4) or m.group(2) or ''
             lo, hi = float(m.group(1)), float(m.group(3))
-            add('range', lead, i + 1, label=clean(strip_filler(s[:m.start()])).rstrip('是在为') or '区间', lo=lo, hi=hi, unit=unit,
+            add('range', lead, i + 1, label=clean(strip_filler(s[:m.start()])).rstrip('是在为'), lo=lo, hi=hi, unit=unit,
                 tLo=char_time(lines, i, m.group(1)), tHi=char_time(lines, i, m.group(3), after=m.start(3)),
                 max=100 if unit == '%' else nice_max(hi))
             i += 1; continue
@@ -347,7 +413,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
                     j += 1; continue
                 if m2 or second or COUNT_RE.search(T[j]) or len(sub) >= 1 or len(T[j]) > 9: break
                 sub.append(T[j]); subT.append(lines[j]['t0']); j += 1
-            if not unit and re.search(r'(价格|便宜|贵|工资|收入|房租|花了|赚|省了|月薪|年薪)', s): unit = '元'
+            if not unit and v >= 10 and re.search(r'(价格|便宜|贵|工资|收入|房租|花了|赚了?|省了|月薪|年薪)$', s[max(0, pos - 6):pos]) and not re.match(r'[\d.,]+\s*[单个人件次点名位台条家只份]', s[pos:]): unit = '元'   # 钱字紧挨着这个数才补「元」（盲审：「下个月10号发工资」补成 10元）
             tone = 'bad' if BAD_RE.search(s + ''.join(sub) + (second['label'] if second else '')) else 'acc'
             add('stat', lead, j, label=label, value=v, unit=unit, t=char_time(lines, i, fmt(v)), sub=sub, subT=subT, second=second, tone=tone,
                 icon=icon_for(s + ''.join(sub)))
@@ -358,7 +424,7 @@ def plan(lines, dur, title=None, theme='night', tag=None):
             i += 1; continue
         # 其余：大字逐字跳，最多 3 行一组
         j = i + 1
-        while j < n and j < i + 3 and not is_cue(j) and not flip_at(j) and not but_at(j) and lines[j]['t1'] - lines[i]['t0'] < 6.5                 and not (CTA_RE.search(T[j]) and j >= n - 3):
+        while j < n and j < i + 3 and not is_cue(j) and not flip_at(j) and not but_at(j) and not cause_at(j) and lines[j]['t1'] - lines[i]['t0'] < 6.5                 and not (CTA_RE.search(T[j]) and j >= n - 3):
             j += 1
         add('say', lead, j, icon=icon_for(''.join(T[i:j])))
         i = j
@@ -382,12 +448,37 @@ def plan(lines, dur, title=None, theme='night', tag=None):
     kw2 = find_kw(''.join(tl))
     cover = dict(title=[mark(x, kw2) for x in tl], kicker=next((s['title'] for s in scenes if s['type'] == 'list' and s.get('title')), tag),
                  icon=scenes[0]['icon'])
+    for sc in scenes:   # 对比卡两边的长句：给拆两行的词边界
+        if sc['type'] == 'myth' and not sc.get('mythCut'):   # 中段误区卡（开场那张在上面已给）
+            sc['mythCut'] = b_cut(sc['myth'])
+        if sc['type'] == 'list':
+            for it in sc['items']: it['cut'] = b_cut(it['head'])
+        if sc['type'] == 'compare':
+            for side in (sc['L'], sc['R']):
+                side['cut'] = b_cut(side['text'])
+
     return dict(dur=round(dur, 3), theme=theme, tag=tag, title=[mark(x, kw2) for x in tl], cover=cover,
                 lines=[dict(t0=l['t0'], t1=l['t1'], cs=l['cs'], kw=l['kw']) for l in lines], scenes=scenes)
 
 
 def mark(s, kw):
     return s.replace(kw, f'[[{kw}]]', 1) if kw and kw in s and len(kw) < len(s) else s
+
+
+def b_cut(s, kw=None):
+    """结果句太长要拆两行时的拆点：词边界里离中间最近的，平局取前一行长的，不切开关键词；拆不了返回 None。"""
+    s = str(s); n = len(s)
+    if n < 6 or '\n' in s: return None
+    ki = s.find(kw) if kw else -1
+    try:
+        import jieba
+        bounds, at = [], 0
+        for w in jieba.cut(s):
+            at += len(w); bounds.append(at)
+    except Exception:
+        bounds = list(range(1, n))
+    ok = [b for b in bounds if 2 <= b <= n - 2 and not (ki >= 0 and ki < b < ki + len(kw))]
+    return min(ok, key=lambda b: (abs(b - n / 2), -b)) if ok else None
 
 
 def split_title(head):
@@ -421,6 +512,22 @@ def fmt(v):
 def num_in(s):
     for m in NUM_RE.finditer(s):
         v = float(m.group(1)); unit = m.group(2) or ''
+        nx, pv = s[m.end():m.end() + 1], s[m.start() - 1:m.start()]
+        if unit == '年' and nx in ('代', '级', '报', '度', '终', '初', '底', '末'):   # 「90年代」「三年级」「2024年报」不是数
+            continue
+        if unit == '年' and 1900 <= v <= 2100 and not dur_before(s, m.start()):   # 「还到2030年」是年份，不是 2030 个年
+            continue
+        if not unit and nx in ('号', '点', '后', '日'):   # 「10号」「11点」「90后」
+            continue
+        if unit == '月' or (unit in ('年', '个月', '天', '周') and nx in ('前', '后')):   # 「3月」是日子，「5年前」是时间点
+            continue
+        if pv == '双' or (pv.isascii() and pv.isalpha()):   # 「双11」「iPhone15」是名字
+            continue
+        p2 = s[max(0, m.start() - 2):m.start()]
+        if pv == '第' or (not unit and pv == ' ' and p2[:1].isascii() and p2[:1].isalpha()) or (not unit and p2 in ('小米', '红米', '苹果', '华为', '荣耀', '三星', '一加', '魅族')):   # 「第10名」「iPhone 15」「小米14」；「ROE 15%」「苹果15块」带单位的照常
+            continue
+        if not unit and v in (315, 520, 618, 996, 1111, 12315) and not re.search('(花了|工资|收入|价格|房租|赚了?|省了)$', s[max(0, m.start() - 4):m.start()]):   # 「618」「996」「12315」是节日、作息、热线；「花了520」是钱
+            continue
         if unit or v >= 10:
             return v, unit, m.start()
     return None
@@ -477,7 +584,7 @@ def try_list(T, i):
         if nxt is not None and (not want or len(items) < want):
             k = nxt; continue                      # 中间那几条：一直吃到下一个「第 X」
         # 最后一条的补充句：最多 3 行，碰到别的信号就停
-        if k - items[-1][0] <= 3 and not (NUM_RE.search(T[k]) and re.search(r'\d', T[k])) and not SOFT.match(T[k])                 and not MYTH_RE.search(T[k]) and not COUNT_RE.search(T[k]):
+        if k - items[-1][0] <= 3 and not (NUM_RE.search(T[k]) and re.search(r'\d', T[k])) and not SOFT.match(T[k])                 and not MYTH_RE.search(T[k]) and not COUNT_RE.search(T[k]) and not (k + 1 < n and COUNT_RE.search(T[k + 1])):
             k += 1; continue
         break
     if len(items) < 2: return None
