@@ -38,7 +38,7 @@
 
 **① 下载**
 
-到本页右侧 **Releases**，在 **Assets** 里只下 **koubo-chengpian-1.3-mianzhuang.zip** 这一个（约 350 MB）。软件要用的 Python、组件、FFmpeg 和听写模型都在里面。**别点页面上方绿色的 Code 按钮**，那里下的是源码，不能直接用。
+到本页右侧 **Releases**，在 **Assets** 里只下 **koubo-chengpian-1.3.1-mianzhuang.zip** 这一个（约 350 MB）。软件要用的 Python、组件、FFmpeg 和听写模型都在里面。**别点页面上方绿色的 Code 按钮**，那里下的是源码，不能直接用。
 
 **② 解压**
 

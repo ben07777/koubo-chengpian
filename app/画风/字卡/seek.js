@@ -146,9 +146,32 @@ function kinLine(parent, li, size) {
   });
   return { box, ch, t0: l.t0, t1: l.t1, h: 0 };
 }
+// 11-13 总控令（1.3.1）：句子里一串连着的数字（中间的小数点、后面紧跟的百分号算进去）整块一起出，出的时刻取这串第一个字原来该出的时刻，不比它早。
+// 「负」「零下」「3到5」的「到」不并进来，两头的数各自一块。普通句卡、开场卡、模板里的句子都走 updChars（开场卡逐字出数是已知问题第 35 条，一起改）；
+// 数字卡、年份卡、区间卡的大数是另一套（numIn），不走这里。NUM_BLOCK 是考卷量牙时关的开关。
+const NUM_BLOCK = true;
+const isDig = s => /^[0-9０-９]+$/.test(s);
+function numLead(ch) {   // 数串里第二个字起，记下跟着这串的第一个字出
+  if (ch._lead) return; ch._lead = true;
+  const tx = ch.map(c => c.e.textContent);
+  for (let i = 0; i < ch.length;) {
+    if (!isDig(tx[i])) { i++; continue; }
+    let j = i + 1;
+    for (;;) {
+      if (j < ch.length && isDig(tx[j])) j++;
+      else if (j + 1 < ch.length && /^[.．]$/.test(tx[j]) && isDig(tx[j + 1])) j += 2;
+      else break;
+    }
+    if (j < ch.length && /^[%％]$/.test(tx[j])) j++;
+    for (let k = i + 1; k < j; k++) ch[k].lead = ch[i];
+    i = j;
+  }
+}
+const chAt = c => { const L = NUM_BLOCK && c.lead ? c.lead : c; return L.tr != null ? L.tr : L.t; };   // 这个字什么时候出
 function updChars(ch, t) {
+  if (NUM_BLOCK) numLead(ch);
   for (const c of ch) {
-    const ct = c.tr != null ? c.tr : c.t;
+    const ct = chAt(c);
     const k = P(t, ct - 0.07, ct + 0.2, E.outC), kb = P(t, ct - 0.07, ct + 0.32, E.outB);
     set(c.e, { o: k, y: (1 - k) * 40, s: 1.3 - 0.3 * kb, b: (1 - k) * 7 });
     if (c.kw) c.e.style.backgroundSize = (P(t, ct + 0.08, ct + 0.34, E.outC) * 100).toFixed(1) + '% 100%';
@@ -646,7 +669,7 @@ function sayPara(sc) {
       const kl = P(t, lift.tL, lift.tL1, E.outC);
       if (kl > 0) {
         const L = lift, g = L.g, gs = shr(tk, t), rs = 1 - (1 - g.RS) * kl * (1 - gs), S = 1 + (g.S1 - 1) * kl * (1 - gs), gx = g.ax + (g.kx - g.ax) * rs;
-        const pop = c => { const ct = c.tr != null ? c.tr : c.t; return [(1 - P(t, ct - 0.07, ct + 0.2, E.outC)) * 40, 1.3 - 0.3 * P(t, ct - 0.07, ct + 0.32, E.outB)]; };
+        const pop = c => { const ct = chAt(c); return [(1 - P(t, ct - 0.07, ct + 0.2, E.outC)) * 40, 1.3 - 0.3 * P(t, ct - 0.07, ct + 0.32, E.outB)]; };
         L.rest.forEach((c, i) => { const [py, ps] = pop(c); c.e.style.transform = `translate(${((g.ax - g.rest[i]) * (1 - rs)).toFixed(2)}px,${py.toFixed(2)}px) scale(${(rs * ps).toFixed(4)})`; c.e.style.color = mixC('var(--ink)', 'var(--sub)', Math.max(kl, gs)); });
         L.key.forEach((c, j) => { const [py, ps] = pop(c), dx = (gx - g.kx) + (g.kc[j] - g.kx) * (S - 1); c.e.style.transform = `translate(${dx.toFixed(2)}px,${(L.DY * kl + py).toFixed(2)}px) scale(${(S * ps).toFixed(4)})`; c.e.style.color = 'var(--acc)'; });
         const top = g.ky + g.h * 0.3, bot = g.ky + L.DY * kl - g.h * S * 0.42;
@@ -1066,6 +1089,9 @@ function build() {
     parts.forEach(p => { const isH = /^\[\[/.test(p); for (const c of plain(p)) { const s = el('span', isH ? 'hl' : null, c, row, { display: 'inline-block' }); tch.push(s); } });
   });
   const longest = Math.max(1, ...(PL.title || ['']).map(x => plain(x).length));
+  // 11-13 总控令（1.3.1）：标题带逐字飞进来（每字隔 0.018 秒），也照整块出数的规矩：一串连着的数字跟这串第一个字一起飞进来。tLead[i] = 第 i 个字跟着第几个字的时刻走
+  const tLead = tch.map((_, i) => i);
+  if (NUM_BLOCK) { const tc = tch.map(e => ({ e })); numLead(tc); tc.forEach((c, i) => { if (c.lead) tLead[i] = tc.indexOf(c.lead); }); }
   ttl.style.fontSize = Math.min(86, 930 / (longest * 0.92)) + 'px';
   if (P12) {   // 11-12 改法二（跟着新排法，第二步起默认开）：开场过后标题只当名牌，一排 44 号灰字，超过 17 个字照原来两排；进度条从 520 上移到 380
     if ((PL.title || []).map(x => plain(x)).join('').length <= 17) ttl.querySelectorAll('.tl').forEach(r => { r.style.display = 'inline'; });
@@ -1088,6 +1114,17 @@ function build() {
     SCN.push(sc);
   }
   for (const sc of SCN) { sc.el.style.display = 'block'; sc.measure.forEach(f => f()); sc.el.style.display = 'none'; }
+  // 11-13 总控令（1.3.1）：换卡不许叠，所有卡种一个规矩。新卡的字、盒子、图形出现的第一帧，上一张必须已经看不见：
+  // 上一张看不见的时刻（开场卡淡到 t1 前 0.08 秒就没了；别的卡 t1 后 0.05 秒）以后才开始露出来，至少 0.3 秒露满（sc.inA 到 sc.inB）。
+  // 11-13 总控定「甲」：卡怎么动（滑进、放大、上移）照 1.3 的老时间走，只把露出来推迟；不然动作被推迟，对比盒还在半路就亮了，右边过 870（饭局 93 秒）。
+  // 原来只有数字卡、年份卡、区间卡这么等（sc.late）；对比卡盒子里换句是盒子自己的事，不归这里（已知问题第 73 条）。CUT_CLEAN 是考卷量牙时关的开关。
+  const CUT_CLEAN = true;
+  SCN.forEach((sc, k) => {
+    sc.inA = sc.late ? sc.t0 + 0.05 : sc.t0 - 0.14; sc.inB = sc.late ? sc.t0 + 0.35 : sc.t0 + 0.36;
+    const p = SCN[k - 1]; if (!CUT_CLEAN || !p) return;
+    const gone = p.type === 'hook' && p.noExit ? p.t1 - 0.08 : p.t1 + 0.05;
+    if (gone > sc.inA) { sc.inA = gone; sc.inB = Math.max(sc.inB, gone + 0.3); }
+  });
 
   // 字幕
   const subOn = li => SCN.some(sc => li >= sc.la && li < Math.max(sc.lb, sc.la + 1) && (PS ? true : !sc.hideSubs && sc.type !== 'hook'));   // 这句的字幕会不会露出来
@@ -1166,7 +1203,7 @@ function build() {
     // 标题带：开场说完飞上去
     const kd = P(t, tDock - 0.3, tDock + 0.35, E.outC);
     tag.style.opacity = kd; tag.style.transform = `translateY(${(1 - kd) * 24}px)`;
-    tch.forEach((s, i) => { const k = P(t, tDock - 0.12 + i * 0.018, tDock + 0.3 + i * 0.018, E.outC); set(s, { o: k, y: (1 - k) * 50, b: (1 - k) * 6 }); });
+    tch.forEach((s, i) => { const j = tLead[i], k = P(t, tDock - 0.12 + j * 0.018, tDock + 0.3 + j * 0.018, E.outC); set(s, { o: k, y: (1 - k) * 50, b: (1 - k) * 6 }); });
     prog.style.width = (clamp(t / PL.dur) * 100) + '%'; $('#prog').style.opacity = kd;
     // 镜头
     let cur = null;
@@ -1177,11 +1214,12 @@ function build() {
       if (t >= sc.t0) cur = sc;
       sc.upd(t);
       if (!sc.noEnter || !sc.noExit) {
-        const a = sc.noEnter ? 1 : sc.late ? P(t, sc.t0 + 0.05, sc.t0 + 0.35, E.outC) : P(t, sc.t0 - 0.14, sc.t0 + 0.36, E.outC), b = sc.noExit ? 0 : P(t, sc.t1 - 0.26, sc.t1 + 0.05, E.inC);   // 数字卡等上一张退干净再进（盲审：年份卡进来时压在上一张没退干净的字上）
+        const a = sc.noEnter ? 1 : sc.late ? P(t, sc.t0 + 0.05, sc.t0 + 0.35, E.outC) : P(t, sc.t0 - 0.14, sc.t0 + 0.36, E.outC), b = sc.noExit ? 0 : P(t, sc.t1 - 0.26, sc.t1 + 0.05, E.inC);
+        const ao = sc.noEnter ? 1 : Math.min(a, P(t, sc.inA, sc.inB, E.outC));   // 露出来的程度：动作照 a 走，透明度等上一张看不见了再升（1.3.1 换卡不叠）   // 数字卡等上一张退干净再进（盲审：年份卡进来时压在上一张没退干净的字上）
         const v = sc.idx % 3;
-        if (v === 1) set(sc.el, { o: a * (1 - b), x: (1 - a) * 260 - b * 260, r: (1 - a) * 2.5 - b * 2.5, s: 1, b: (1 - a) * 6 + b * 6 });
-        else if (v === 2) set(sc.el, { o: a * (1 - b), s: (1.16 - 0.16 * a) * (1 - 0.1 * b), b: (1 - a) * 10 + b * 8 });
-        else set(sc.el, { o: a * (1 - b), s: (0.93 + 0.07 * a) * (1 + 0.08 * b), y: (1 - a) * 60 - b * 30, b: (1 - a) * 9 + b * 9 });
+        if (v === 1) set(sc.el, { o: ao * (1 - b), x: (1 - a) * 260 - b * 260, r: (1 - a) * 2.5 - b * 2.5, s: 1, b: (1 - a) * 6 + b * 6 });
+        else if (v === 2) set(sc.el, { o: ao * (1 - b), s: (1.16 - 0.16 * a) * (1 - 0.1 * b), b: (1 - a) * 10 + b * 8 });
+        else set(sc.el, { o: ao * (1 - b), s: (0.93 + 0.07 * a) * (1 + 0.08 * b), y: (1 - a) * 60 - b * 30, b: (1 - a) * 9 + b * 9 });
       }
     }
     cur = cur || SCN[0];
