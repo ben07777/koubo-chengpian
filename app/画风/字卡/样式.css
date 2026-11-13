@@ -1,11 +1,4 @@
-<!doctype html>
-<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'nonce-stageboot'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>stage</title>
-<style>
-@font-face{font-family:Glow;src:url(fonts/GlowSansSC-Condensed-Heavy.otf)}
-@font-face{font-family:Noto;src:url(fonts/NotoSansSC-VF.ttf);font-weight:100 900}
-@font-face{font-family:Smiley;src:url(fonts/SmileySans-Oblique.ttf)}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+/* 字卡画风的样式（原 stage.html 里的，原样搬来） */
 #frame{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--bg0);color:var(--ink);font-family:Noto,sans-serif;-webkit-font-smoothing:antialiased}
 #bg,#bg>*{position:absolute;inset:0}
 .blob{border-radius:50%;width:1100px;height:1100px;left:-10px;top:-10px;inset:auto}
@@ -38,24 +31,3 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .stamp{position:absolute;font:92px Glow;color:var(--bad);border:10px solid var(--bad);border-radius:22px;padding:4px 30px 10px;white-space:nowrap;background:var(--bg0)}
 /* 封面 */
 #cover{position:absolute;inset:0;display:none}
-</style>
-</head><body>
-<div id="frame">
-  <div id="bg"><div class="blob" id="b1"></div><div class="blob" id="b2"></div><div class="blob" id="b3"></div><div id="grid"></div></div>
-  <div id="top"><div id="tag"></div><div id="ttl"></div><div id="prog"><i></i></div></div>
-  <div id="stage"><div id="cam"></div></div>
-  <div id="sweep"></div>
-  <div id="subs"></div>
-  <div id="cover"></div>
-  <div id="grain"></div>
-  <div id="flash"></div>
-</div>
-<script src="core.js"></script>
-<script src="icons.js"></script>
-<script nonce="stageboot">
-const Q = new URLSearchParams(location.search);
-const s = document.createElement('script'); s.src = Q.get('plan');
-s.onload = () => { const d = document.createElement('script'); d.src = 'director.js'; document.body.appendChild(d); };
-document.body.appendChild(s);
-</script>
-</body></html>

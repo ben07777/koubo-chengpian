@@ -21,6 +21,11 @@ def _clauses(segs):
         for i, tk in enumerate(toks):
             tk = tk.replace('▁', ' ').strip()
             if not tk: continue
+            nxt = toks[i + 1].replace('▁', ' ').strip() if i + 1 < len(toks) else ''
+            if cur and tk in '.．-－−:：/／,' and cur[-1][0] in '0123456789０１２３４５６７８９' and nxt[:1] and nxt[0] in '0123456789０１２３４５６７８９':
+                cur.append((tk, ts[i])); continue            # 数中间的符号（. - : / ,）：不在这里断小句（和听写拍平那一步同一个认法，11-09 复审、第三轮）
+            if tk in '-－−' and nxt[:1] and nxt[0] in '0123456789０１２３４５６７８９' and not (cur and cur[-1][0] in '0123456789０１２３４５６７８９'):
+                cur.append(('负', ts[i])); continue           # 负号：留着，不当标点断句
             if PUNCT.fullmatch(tk):
                 if cur: out.append(cur); cur = []
                 continue

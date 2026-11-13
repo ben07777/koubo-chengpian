@@ -11,7 +11,7 @@ ROOT = APP.parent
 (ROOT/'runtime').mkdir(exist_ok=True)
 OUT = ROOT / '出片'; OUT.mkdir(exist_ok=True)
 sys.path.insert(0, str(APP))
-import pipeline  # noqa: E402
+import pipeline, juben  # noqa: E402
 
 LOCK = threading.Lock()
 TYPES = {'.mp4': 'video/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.srt': 'text/plain; charset=utf-8', '.html': 'text/html; charset=utf-8',
@@ -117,10 +117,37 @@ class H(BaseHTTPRequestHandler):
         try:
             if u.path in ('/', '/index.html'): return self.file(APP / 'web' / 'index.html')
             if u.path.startswith('/web/'): return self.file((APP / 'web' / Path(unquote(u.path[5:])).name))
+            if u.path == '/icons.js': return self.file(APP / '画风' / '公共' / 'icons.js')   # 校字页画图标用（和画风同一份 Lucide）
             if u.path == '/api/ping':
                 global LAST_PING; LAST_PING = time.time(); return self.send(200, {})
+            if u.path == '/api/ver': return self.send(200, {'v': pipeline.xieshou.VERSION})   # 11-10：首页角落的版本号，读本机，不联网
+            if u.path == '/api/styles':                                # 首页「画风」选择：有预览图、没标「首页列出: false」的才给选（11-12 起只剩字卡，首页那一行就不出）
+                out = []
+                for n in pipeline.render.listed_styles():
+                    m = pipeline.render.style_meta(n); line = re.split('[：:。；;，,]', m.get('一句话', ''))[0][:14]
+                    out.append(dict(name=n, line=line, palette=bool((m.get('配色') or {}).get('可选'))))
+                out.sort(key=lambda x: x['name'] != '字卡')
+                return self.send(200, out)
+            if u.path.startswith('/style/'):
+                n = unquote(u.path[7:]).split('/')[0]
+                if n not in pipeline.render.styles(): raise ValueError('页面出错了，请刷新后再试')
+                return self.file(APP / '画风' / n / '预览.jpg')
             if u.path == '/api/info':
-                return self.send(200, dict(running=RUNNING))
+                x = pipeline.xieshou; p = pref(); agreed = p.get('云端已同意') is True
+                ai = p.get('云端排画面') if agreed else None; on = bool(x.relay_url()) and ai is True   # 11-09 盲审：没点过「知道了，用云端」就当没开
+                if x.relay_url(): x.device_id()                         # 算出设备号写进 runtime\设备号.txt（只在本机，不发），他要把自己的电脑设成不限时抄这串
+                trial = (x.ask_trial() if on else x.trial_info()) if x.relay_url() else {}   # 11-09：免费版一点不碰服务器。开了云端才问中转剩几条、问模型名；没开只用上次记的
+                beian = (x.relay_beian() if on else '') or str(x.settings().get('云端备案号') or '').strip()[:60]   # 11-09 第三轮 E：首页公示那句的备案号也从配置出
+                return self.send(200, dict(running=RUNNING, cloud=bool(x.relay_url()), model=(x.relay_name() if on else '') or x.settings().get('云端模型名') or '', beian=beian, ai=ai, agreed=agreed, trial=trial or None,
+                                           code=x.show_code(x.get_code())))   # cloud：设了中转地址，首页才出「云端排画面」开关；code：填过的次数码（只在本机）
+            if u.path == '/api/pro':                                   # 「了解专业版」那页：价钱、链接、收款码读本地 开卖.json；条数、期限问中转（11-09 第三轮）
+                x = pipeline.xieshou; d = x.pro_info() if x.relay_url() else {}; d['model'] = d.get('model') or x.settings().get('云端模型名') or ''
+                if not d.get('备案号'): d['备案号'] = str(x.settings().get('云端备案号') or '').strip()[:60]
+                return self.send(200, d)
+            if u.path == '/api/shoukuanma':                            # 开卖页的收款码：读软件包里 开卖\ 夹的图，不向服务器要（11-09 第三轮）
+                x = pipeline.xieshou; r = x.pro_qr() if x.relay_url() else None
+                if not r: return self.send(404, {'err': '没有收款码'})
+                return self.send(200, r[0], r[1])
             if u.path == '/api/jobs':
                 jobs = []
                 for d in sorted(OUT.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)[:12]:
@@ -160,7 +187,7 @@ class H(BaseHTTPRequestHandler):
                 src = d / ('原素材' + ext); self.save_body(src)
                 pipeline.Job(d).mark('排队', 1, '录音已存进本机文件夹：出片\\' + d.name)
                 run_job(d, src=src, theme=g('theme', '夜幕'), music=g('music', '1') == '1', keep_person=g('person', '0') == '1',
-                        trim=g('trim', '1') == '1', focus=g('focus') or None)
+                        trim=g('trim', '1') == '1', focus=g('focus') or None, style=unquote(g('style', '字卡')), use_ai=g('ai', '0') == '1' and agreed())
                 return self.send(200, {'id': d.name})
             if u.path == '/api/redo':
                 if LOCK.locked(): return self.send(409, {'err': '还在生成中，完成后再修改'})
@@ -170,9 +197,13 @@ class H(BaseHTTPRequestHandler):
                 edited=b.get('lines')
                 if not isinstance(edited,list) or len(edited)!=len(prior.s.get('lines',[])) or not all(isinstance(x,str) and x.strip() for x in edited):
                     raise ValueError('字幕不能为空，也不能增删行')
+                shows = b.get('shows')
+                if shows is not None and (not isinstance(shows, list) or len(shows) != len(edited) or not all(x is None or isinstance(x, dict) for x in shows)):
+                    raise ValueError('上屏词的修改和字幕行数对不上，请刷新后再试')
+                shows = juben.merge_show_edits(prior.s.get('show_edits'), shows)   # 第二轮修改叠在第一轮上
                 new = OUT / (re.sub(r'_校字_[0-9a-f]+$', '', d.name) + '_校字_' + uuid.uuid4().hex[:6])
                 new.mkdir()
-                for pattern in ('原素材.*','剪后素材.*','vo.wav','lines_asr.json','job.json','剪掉的地方.txt','我的配乐.*'):
+                for pattern in ('原素材.*','剪后素材.*','vo.wav','lines_asr.json','job.json','剪掉的地方.txt','我的配乐.*','剧本_写手原稿.json'):
                     for f in d.glob(pattern):
                         try: os.link(f, new/f.name)
                         except OSError: shutil.copyfile(f, new/f.name)
@@ -182,7 +213,8 @@ class H(BaseHTTPRequestHandler):
                 pending.mark('排队',1,'正在按校对后的字幕重新导出')
                 run_job(new, src=None, focus=b.get('focus') or None, theme=b.get('theme', '夜幕'), music=b.get('music', True) not in (False, 'off'),
                         edits=b.get('lines'), title=[x for x in b.get('title', []) if x.strip()] or None, my_music=mine,
-                        keep_person=b.get('person'), cover_t=b.get('cover_t'))
+                        keep_person=b.get('person'), cover_t=b.get('cover_t'), style=b.get('style') or prior.s.get('style', '字卡'), shows=shows,
+                        use_ai=b.get('ai', prior.s.get('use_ai', False)) not in (False, 0, '0') and agreed(), title_mark=b.get('title_mark'), cover_icon=b.get('cover_icon'))
                 return self.send(200, {'id':new.name})
             if u.path == '/api/bgm':
                 d = safe_id(g('id')); ext = Path(unquote(g('name', 'm.mp3'))).suffix.lower()
@@ -190,11 +222,62 @@ class H(BaseHTTPRequestHandler):
                 if not 0 < int(self.headers.get('Content-Length') or 0) <= 256*1024**2: raise ValueError('配乐请选择 256MB 以内的文件')
                 for old in d.glob('我的配乐.*'): old.unlink()
                 self.save_body(d / ('我的配乐' + ext)); return self.send(200, {'ok': True})
+            if u.path == '/api/pref':                                  # 用户在首页或修改区开关「云端排画面」：软件记住（换端口也不忘）
+                b = json.loads(self.body() or b'{}'); v = b.get('云端排画面')
+                if v not in (True, False): raise ValueError('只收开或关')
+                if b.get('云端已同意') is True: set_pref(云端排画面=v, 云端已同意=True)   # 只有「知道了，用云端」那一下带这个
+                elif v and not agreed(): raise ValueError('要先看过说明、点「知道了，用云端」')
+                else: set_pref(云端排画面=v)
+                return self.send(200, {'ok': True})
+            if u.path == '/api/code':                                  # 填次数码：存在本机 runtime\次数码.txt，马上问中转还剩几条；空 = 拿掉
+                x = pipeline.xieshou; v = str(json.loads(self.body() or b'{}').get('码') or '').strip()
+                k = x.norm_code(v)
+                if v and not k: raise ValueError('次数码的格式不对：应该是 20 个字母和数字，可以带短横，比如 ABCDE-FGH23-JKMNP-QRS45')
+                x.set_code(k)
+                if k and not agreed():                                 # 11-09 盲审：还没点过「知道了，用云端」：码只存在本机，不发给中转，先出同意说明
+                    return self.send(200, dict(ok=True, code=x.show_code(k), ai=False, need_agree=True, trial=x.trial_info() or None))
+                if k:                                                  # 填了码就是要用云端：开关打开，问一次中转
+                    set_pref(云端排画面=True)
+                    return self.send(200, dict(ok=True, code=x.show_code(k), ai=True, trial=(x.ask_trial(force=True) if x.relay_url() else x.trial_info()) or None))
+                return self.send(200, dict(ok=True, code='', trial=x.trial_info() or None))
+            if u.path == '/api/liaojie':                               # 「了解专业版」那页打开了：告诉中转加一次数；每台电脑只记第一次
+                if not pref().get('了解专业版已记') and pipeline.xieshou.relay_url():
+                    def tell():
+                        if pipeline.xieshou.tell_pro():
+                            set_pref(了解专业版已记=True)
+                    threading.Thread(target=tell, daemon=True).start()
+                return self.send(200, {'ok': True})
             if u.path == '/api/open':
                 d = safe_id(g('id')); os.startfile(str(d)); return self.send(200, {'ok': True})
             self.send(404, {'err': '页面出错了，请刷新后再试'})
         except Exception as e:
             self.send(400, {'err': cn(e)})
+
+
+PREF = APP.parent / 'runtime' / '偏好.json'
+
+
+def pref():
+    with _PREF_LOCK:                             # 读也排队：Windows 上有人正读着，整份换上去会被拒
+        try: return json.loads(PREF.read_text(encoding='utf-8'))
+        except (OSError, ValueError): return {}
+
+
+_PREF_LOCK = threading.RLock()                   # 同一个线程能重复进（set_pref 里面还要读一次）
+
+
+def agreed():
+    """看过同意说明、点过「知道了，用云端」没有。没点过，什么都不往中转发（11-09 盲审）。"""
+    return pref().get('云端已同意') is True
+
+
+def set_pref(**kv):
+    """改偏好：排队改（连着点两下开关，两次写同时进来会把文件写坏），先写临时文件再整份换上去。返回改之前的样子。"""
+    with _PREF_LOCK:
+        old = pref(); new = dict(old, **kv)
+        PREF.parent.mkdir(exist_ok=True); tmp = PREF.with_name(PREF.name + '.tmp')
+        tmp.write_text(json.dumps(new, ensure_ascii=False), encoding='utf-8'); os.replace(tmp, PREF)
+        return old
 
 
 def free_port(start=8765):

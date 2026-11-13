@@ -84,7 +84,7 @@ def write_subtitles(jobdir):
 def render_adapters(app,jobdir,focus):
     """原版在生成 mix.wav/plan.js 后调用这两个接口，后续合成、成片名、SRT 都交回原版。"""
     import pipeline,render
-    fontdir=app/"stage/fonts"
+    fontdir=app/"画风/公共/fonts"
     @lru_cache(128)
     def face(size,display=False):
         path=fontdir/("GlowSansSC-Condensed-Heavy.otf" if display else "NotoSansSC-VF.ttf")

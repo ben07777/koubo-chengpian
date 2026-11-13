@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'nonce-stageboot'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>画风</title>
+<!-- 所有画风共用的页面壳：字体、全局重置、一个 1080×1920 的 #frame。
+     加载顺序：公共 core.js、icons.js → data.js（window.JUBEN 剧本 + window.OPTS 画风参数）→ 这个画风的 seek.js。
+     画风自己的 DOM 由 seek.js 搭，自己的样式在 style.css（画风.json 里「样式」声明的文件）。 -->
+<style>
+@font-face{font-family:Glow;src:url(fonts/GlowSansSC-Condensed-Heavy.otf)}
+@font-face{font-family:Noto;src:url(fonts/NotoSansSC-VF.ttf);font-weight:100 900}
+@font-face{font-family:Smiley;src:url(fonts/SmileySans-Oblique.ttf)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+</style>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="frame"></div>
+<script src="core.js"></script>
+<script src="icons.js"></script>
+<script nonce="stageboot">
+const Q = new URLSearchParams(location.search);
+const s = document.createElement('script'); s.src = 'data.js';
+s.onload = () => { const d = document.createElement('script'); d.src = 'seek.js'; document.body.appendChild(d); };
+document.body.appendChild(s);
+</script>
+</body></html>

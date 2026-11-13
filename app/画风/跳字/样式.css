@@ -1,0 +1,6 @@
+/* 画风「跳字」的样式：从第二批样片工程 page2.html 原样搬来（字体和全局重置在公共页面壳里）。 */
+#frame{position:relative;width:1080px;height:1920px;overflow:hidden;font-family:Noto,sans-serif}
+#c{position:absolute;left:0;top:0}
+#view{position:absolute;inset:0;overflow:hidden}
+#subs{position:absolute;left:60px;width:800px;display:flex;align-items:center;justify-content:center;text-align:center}
+.sub{position:absolute;width:800px;font:800 62px/1.28 Noto;letter-spacing:1px;display:none}

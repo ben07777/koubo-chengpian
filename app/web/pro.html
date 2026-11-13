@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>了解专业版 · 口播成片</title>
+<style>
+:root{--bg:#F5F3EE;--card:#fff;--ink:#1B1A17;--sub:#6E675C;--line:#E4DED3;--acc:#E2412B}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 "Microsoft YaHei","PingFang SC",sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:26px;margin:0 0 14px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+h2{font-size:18px;margin:18px 0 6px}h2:first-child{margin-top:0}ul{margin:0;padding-left:1.2em}li{margin:4px 0}.tip{color:var(--sub);font-size:14px}
+.one{font-size:19px;margin:0 0 6px}a{color:var(--acc)}
+</style></head><body><div class="wrap">
+<!-- 11-09 开卖版（他说「赶紧上架产品吧」）。这一页只写：开卖那句话、用完或到期会怎样、怎么买怎么填码、退款，外加发什么出去和公示那两句。
+     11-09 第三轮：价钱、怎么买（购买链接或收款码，二选一）读软件包里的 开卖.json 和 开卖 夹的图，不从服务器取（传输加密之前，怕有人在半路换掉）；
+     条数、期限、退款那几句、模型名、备案号问中转（经 /api/pro 来），页面里一个数都不写死。本地没配价钱、两样都空着时写「还没开卖」，不出死链接、不出空图。上架清单里禁用的那四个词一个都不写，不催买。打开时告诉中转加一次数（什么内容都不发）。 -->
+<h1>了解专业版</h1>
+<div class="card">
+  <p class="one" id="line">正在查……</p>
+  <p class="tip" id="noN" hidden>现在连不上云端，条数和期限暂时查不到。云端连上以后再打开这一页。</p>
+  <p class="tip" id="noSet" hidden>云端连上了，但条数和期限还没设好，暂时查不到。过一阵再打开这一页。</p>
+
+  <h2>用完或到期会怎样</h2>
+  <ul>
+    <li>用完 <span class="n">…</span> 条，或者过了<span class="term">期限</span>，云端就停。软件照常能用，画面改在你电脑上排。</li>
+    <li><span class="term">期限</span>从你第一次用的那天算起<span id="daysNote"></span>。</li>
+    <li>云端连不上，也自动改在你电脑上排，照样出片。</li>
+    <li id="siteLine">云端全站每天有总量上限，防人恶意刷。满了的那天，这条不扣，改在你电脑上排，第二天照常。</li>
+  </ul>
+
+  <h2>怎么买、怎么填码</h2>
+  <ul>
+    <li id="buyNo">还没开卖。</li>
+    <li id="buyYes" hidden><a id="buyLink" target="_blank" rel="noopener noreferrer">打开购买页面</a>，付完钱会拿到一串次数码。</li>
+    <li id="buyQr" hidden><span id="qrLine"></span><img id="qrImg" alt="收款码" style="display:block;width:240px;max-width:100%;margin:10px 0 4px;border:1px solid var(--line);border-radius:8px"></li>
+    <li>回到软件首页，把次数码填进云端开关下面「次数码」那一格，点「保存」。开关旁会写还剩几条、到哪天为止。</li>
+    <li>码不绑电脑，换电脑、两台电脑一起用都行，条数是总数。</li>
+  </ul>
+
+  <div id="refundBox" hidden>
+    <h2>退款</h2>
+    <ul id="refund"></ul>
+  </div>
+</div>
+<div class="card">
+  <h2>云端排画面发什么出去</h2>
+  <ul>
+    <li>发字幕文字和每句开始的秒数，让 AI（<span class="mdl">云端模型</span>）帮你排画面：每句挑哪个词上屏。另外带上记数用的：这台电脑的设备号（一串乱码）、次数码、录音记号（按录音文件算的一串乱码，不含内容）、软件版本号。录音和视频不发。</li>
+    <li>眼下字幕文字是不加密传到我们服务器的；域名备案下来以后，换成加密传输。</li>
+    <li>不开云端，录音、视频、字幕都不出你的电脑。</li>
+    <li>条数按录音算，同一条录音改了字幕、改了画面重新生成不另算；录音剪过、转过格式再导入，算新的一条。云端没排成的不算。</li>
+    <li>云端一条最多排 <span id="waitN">一分多钟</span>。长稿会分几段同时排。哪几句没按时回来、被拦下，或者云端没给词，那几句用你电脑上排的词。真用上云端词的句子不到一半，这条不扣。</li>
+    <li>在修改页重新生成时，字幕没改、云端开关没动的话，画面沿用上一次排的。</li>
+    <li>出片前，请在修改页把画面上的词看一遍。</li>
+    <li id="tryLine" hidden>没填次数码的，每台电脑可以免费试 <b id="tryN"></b> 条（试用全站每天有名额，满了第二天再来）。</li>
+  </ul>
+  <p class="tip">云端排画面使用<span class="mdl">云端模型</span><span id="beianPart" hidden>，算法备案号：<span id="beian"></span></span>。云端只从你说的话里挑词排画面，不替你写内容，结果只给你自己看。</p>
+</div>
+<p class="tip">关掉这一页，回去接着用就行。</p>
+</div>
+<script>
+fetch('/api/liaojie', { method: 'POST', body: '{}' }).catch(() => {});
+const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
+const noN = set => { $(set === true ? '#noSet' : '#noN').hidden = false; $('#line').textContent = '专业版：云端排画面按条数收费，一次付费，用完或到期就停，软件照常能用。'; };
+const buy = j => {                                                     // 价钱、购买链接、收款码都是软件包里的：连不上云端也照样出（11-10 复审第 11 条）
+  const link = String(j['链接'] || '');
+  if (/^https:\/\/[^\s"<>\\]{4,500}$/.test(link)) { $('#buyLink').href = link; $('#buyYes').hidden = false; $('#buyNo').hidden = true; }
+  else if (j['收款码'] === true && j['收款码说明']) {                 // 怎么买的第二种：收款码 + 说明（两样都填了只出购买链接）。图出来了才露这一行，出不来照样写「还没开卖」
+    const img = $('#qrImg'); $('#qrLine').textContent = j['收款码说明'];
+    img.onload = () => { $('#buyQr').hidden = false; $('#buyNo').hidden = true; };
+    img.src = '/api/shoukuanma?t=' + Date.now();
+  }
+};
+fetch('/api/pro').then(r => r.json()).then(j => {
+  $$('.mdl').forEach(x => x.textContent = j.model || '云端模型');
+  if (typeof j['备案号'] === 'string' && j['备案号'].trim()) { $('#beian').textContent = j['备案号'].trim(); $('#beianPart').hidden = false; }   // 备案号从配置来（11-09 第三轮），没有就不写这半句
+  if (!Number.isInteger(j['条'])) {                                   // 条数、期限是服务器发码时真给的：问不到就说「连不上」；连上了却缺数说「还没设好」
+    noN(j['连上'] === true);
+    if (j['价钱'] && j['价钱句']) { $('#line').textContent = j['价钱句']; buy(j); }   // 11-10：本地配了价钱，价钱和怎么买照样写，只是条数、期限查不到
+    return;
+  }
+  $$('.n').forEach(x => x.textContent = j['条']);
+  const term = j['期限'] || (j['天'] === 365 ? '一年' : j['天'] + ' 天');
+  $$('.term').forEach(x => x.textContent = term);
+  const site = j['全站每天'];                                            // 全站每天最多排几次（中转配置来的）：有数就明写，0 = 不拦填了码的，不写这一行
+  if (Number.isInteger(site) && site > 0) $('#siteLine').textContent = '全站每天最多排 ' + site + ' 次（同一条录音重出也算一次），满了当天退回本机排画面，不扣你的条数。';
+  else if (site === 0) $('#siteLine').hidden = true;
+  if (Number.isInteger(j['等']) && j['等'] > 0) $('#waitN').textContent = j['等'] + ' 秒';   // 一条最多排几秒（中转配置来的，11-09 复审轻 1）
+  if (Number.isInteger(j['天'])) $('#daysNote').textContent = '，连那天一共 ' + j['天'] + ' 天';   // 「一年」按 365 天算，写明
+  if (Number.isInteger(j['试用']) && j['试用'] > 0) { $('#tryN').textContent = j['试用']; $('#tryLine').hidden = false; }
+  if (!(j['那句话'] && j['价钱'])) { $('#line').textContent = '专业版：云端排画面按条数收费，一次付费，用完或到期就停，软件照常能用。'; return; }   // 本地 开卖.json 没配价钱：还没开卖
+  $('#line').textContent = j['那句话'];
+  buy(j);
+  const rf = Array.isArray(j['退款']) ? j['退款'].filter(x => typeof x === 'string' && x.trim()) : [];
+  if (rf.length) { rf.forEach(x => { const li = document.createElement('li'); li.textContent = x; $('#refund').appendChild(li); }); $('#refundBox').hidden = false; }
+}).catch(noN);
+</script>
+</body></html>
