@@ -75,12 +75,14 @@ function zkScene(s) {
   }
   if (s.kw) { let li = -1; for (let i = s.la; i < s.lb; i++) if (lineText(LN[i]).includes(s.kw)) { li = i; break; } if (li < 0 || !said(li, s.kw, '标亮')) s = Object.assign({}, s, { kw: '' }); }
   if (s.tpl) {   // 11-12 夜：模板也登记，修改页列成「模板」那颗签，点 × 去掉，这张卡照普通句卡出（带图形的那句仍单独一张）
-    const nm = TPL_NAME[s.tpl.kind], lab = nm && (s.tpl.kind === 'ban' || s.tpl.kind === 'example' ? `${nm}：${s.tpl.word}` : nm);
+    const nm = TPL_VNAME[s.tpl.var] || TPL_NAME[s.tpl.kind], lab = nm && (['ban', 'example', 'attn', 'auto'].includes(s.tpl.kind) ? `${nm}：${s.tpl.word}` : nm);   // 1.3.2：框住、打勾的签也带上那个词
     if (!lab || !said(s.tpl.line, lab, '模板')) s = Object.assign({}, s, { tpl: null });
   }
   return s;
 }
-const TPL_NAME = { ban: '圈加斜杠', example: '拎出来', time: '圆盘钟点', grow: '拉开' };   // 这一版只带这四种（planner 也只认这四种）
+const TPL_NAME = { ban: '圈加斜杠', example: '拎出来', time: '圆盘钟点', grow: '拉开', drop: '往下', attn: '框住', auto: '打勾', para: '排比', quote: '对话框' };   // 1.3.2 十种（钱不单做），和 planner 的 TPL_NAME 一样
+const TPL_VNAME = { bar: '长条', rise: '往上', extra: '多出一截', corner: '四个角' };   // 同一种里换了画法的，签上写这个（和 planner 的 TPL_VNAME 一样）
+const TPL_TEXT = ['ban', 'example', 'attn', 'auto', 'quote'];   // 1.3.2：只动字的五种，都接在新排法里（和 planner 的 TPL_TEXT 一样）
 const CY = 400;
 const KCY = 330;  // 大字中心：原 400，下沿会钻进右侧按钮列（画面 y≥1000），整体上提 70
 // 舞台坐标 y≥455（画面 y≥1000）的字，右缘不过 880：居中 540 时宽度不超过 680
@@ -242,6 +244,32 @@ const LIGHT = (h => { const n = parseInt(String(h).slice(1, 7), 16); return ((n 
 function tplRows(sc, rows) {   // 几行字（可以来自不同的句子），各自字号、哪几个字用重点色
   return rows.map(r => Object.assign(tplText(sc.el, r.line, r.a, r.b, r.size, i => inR(r.acc, i) ? 'var(--acc)' : null), { row: r }));
 }
+// 1.3.2：带图形的模板那几排字（可以带上前一句，planner._g_merge 排好字号）：从上往下叠，整块中心在 TPL_Y（画面 760），横向对着图形中心。和 planner._g_fit 同一算法
+function gRows(sc, rows, li) {
+  const R = tplRows(sc, rows.map(r => Object.assign({ line: li }, r))), GAP = 20;
+  sc.measure.push(() => {
+    const hs = R.map(r => r.box.offsetHeight * 0.86), tot = hs.reduce((a, b) => a + b, 0) + GAP * (R.length - 1);
+    let y = TPL_Y - tot / 2; R.forEach((r, i) => { Object.assign(r.box.style, { top: (y - r.box.offsetHeight * 0.07) + 'px', left: (TPL_GX - 450) + 'px' }); y += hs[i] + GAP; });
+  });
+  return R;
+}
+// 1.3.2：增长·往上的一笔（模板三变化一）、下降·往下的一笔（增长反过来）：一条直线，粗 16，重点色，左下到右上（下降左上到右下，画面 960 到 1270），头上一个箭头跟着笔头走。
+// 从 a0 起笔（关键词开口前 0.4 秒），做完时画到头（最晚关键词最后一个字开口时，planner 算好），先快后慢，画完原样停住。
+// 方案里「关键词同时放大到 1.15 倍」没做：字是一个个跳出来的，再放大会挤到旁边的字。
+function trendStroke(sc, R, dir) {
+  const tp = sc.tpl, a0 = tp.a0, tE = tp.done;
+  const XA = 150, XB = 830, [y0, y1] = dir > 0 ? [725, 415] : [415, 725];
+  const svg = svgBox(sc.el, 0, 0, 1080, 1000); svg.dataset.tplmark = 1;   // 量帧用
+  const ln = svgEl('line', { x1: XA, y1: y0, x2: XB, y2: y1, stroke: 'var(--acc)', 'stroke-width': 16, 'stroke-linecap': 'round' }, svg);
+  const ang = Math.atan2(y1 - y0, XB - XA), AL = 46, AW = 0.55, wing = a => `${(XB + AL * Math.cos(a)).toFixed(2)},${(y1 + AL * Math.sin(a)).toFixed(2)}`;
+  const head = svgEl('polyline', { points: `${wing(ang + Math.PI - AW)} ${XB},${y1} ${wing(ang + Math.PI + AW)}`, fill: 'none', stroke: 'var(--acc)', 'stroke-width': 16, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+  tplDone(sc, tE);
+  return t => {
+    R.forEach(r => updChars(r.ch, t));
+    const p = P(t, a0, tE, E.outC); dash(ln, p);
+    head.setAttribute('transform', `translate(${((XB - XA) * (p - 1)).toFixed(2)} ${((y1 - y0) * (p - 1)).toFixed(2)})`); head.style.opacity = p > 0.03 ? 1 : 0;
+  };
+}
 const TPL = {
   // 禁止·圈加斜杠（模板五变化一）：否定词一开口变坏色；被禁的词从第一个字开口起被长圆框围住，说完合上（至少 0.3 秒）；
   // 再压一道斜杠 0.12 秒，到位整张卡震一下。被禁的词保持字色。照普通句卡排字，后面的句子来时连同记号一起缩上去。
@@ -358,38 +386,31 @@ const TPL = {
   },
 };
 // ---------- 模板第二批（11-12 小样）：注意·框住、时间·长条、增长·多出来的一截和拉开、举例·拎出来。接在第一批后面，同一套规矩 ----------
-// 时间·长条（模板一变化三）：一根横轨（第 120 到 870 像素；11-12 总控令左头往里收 10，镜头推近时不出线；粗 20，圆头），开口时 0.3 秒画出来，重点色从左头往右走，右头淡出不封口。
-// 走不完的（mode: 'endless'）：第 1 秒走到四成，之后越走越慢，到换卡还在挪；分两步的（mode: 'steps'）：说到哪个词走到哪儿，0.4 秒。
+// 时间·长条（模板一变化三）：一根横轨（第 120 到 860 像素，1.3.2 右头收 10；11-12 总控令左头往里收 10，镜头推近时不出线；粗 20，圆头），开口时 0.3 秒画出来，重点色从左头往右走，右头淡出不封口。
+// 1.3.2：起止照 planner（a0 卡上第一句开口，done 最晚关键词最后一个字开口），做完停住（11-12 夜总控：带图形的做完要停 0.8 秒；方案原来是走不完、到换卡还在挪，和这条撞了，照总控的）。
+// 一句的（没有数的久）：第 1 秒走到四成，之后越走越慢；两句合一张的（持续几年／十几年，planner 记了前一句的词 pkey）：说到前一句的词走到三成五，说到这句的词冲到九成。
 function timeBar(sc) {
-  const tp = sc.tpl;
-  if (!tp.rows || !(tp.mode === 'endless' || (tp.mode === 'steps' && tp.steps))) return null;
-  sc.hideSubs = true;
-  const R = tplRows(sc, tp.rows), Y = 570, X0 = 120, X1 = 870, W_ = X1 - X0;
+  const tp = sc.tpl, li = tp.line, f0 = tp.first != null ? tp.first : li;
+  if (!tp.rows || tp.done == null || sc.la !== f0 || sc.lb !== li + 1) return null;
+  sc.hideSubs = true; sc.el.dataset.tpl = 'time';   // 量帧用
+  const R = gRows(sc, tp.rows, li), Y = 570, X0 = 120, X1 = 860, W_ = X1 - X0;   // 1.3.2：右头收到 860，镜头推近后量到 879 过了 870，收 10
   const track = el('div', null, null, sc.el, { position: 'absolute', left: X0 + 'px', top: (Y - 10) + 'px', width: W_ + 'px', height: '20px', borderRadius: '10px', background: 'var(--line)', transformOrigin: '0 50%' });
   const fill = el('div', null, null, track, { position: 'absolute', left: '0px', top: '0px', height: '20px', width: '0px', borderRadius: '10px 0 0 10px',
     background: 'linear-gradient(90deg, var(--acc) 0, var(--acc) calc(100% - 70px), color-mix(in srgb, var(--acc) 0%, transparent) 100%)' });
-  const tB = LN[tp.rows[0].line].t0;
-  let frac, tDone;
-  if (tp.mode === 'endless') {
-    const T = 1.07, A = 0.4 / (1 - Math.exp(-1 / T));
-    frac = t => A * (1 - Math.exp(-Math.max(0, t - tB) / T));
-    tDone = LN[tp.line].t1;                                                       // 走不完：算到关键词说完
+  track.dataset.tplmark = 1; fill.dataset.tplmark = 1;   // 量帧用：主动作是轨道和走过的那段
+  const a0 = tp.a0 != null ? tp.a0 : LN[f0].t0 - 0.05, tDone = tp.done;
+  let frac;
+  if (tp.pkey && f0 !== li) {
+    const t1 = Math.max(a0 + 0.3, Math.min(chT(f0, tp.pkey[1] - 1), tDone - 0.3)), t2 = Math.max(t1, Math.min(chT(li, tp.key[0]) - 0.1, tDone - 0.3));
+    frac = t => 0.35 * P(t, a0, t1, E.outC) + 0.55 * P(t, t2, tDone, E.outC);
   } else {
-    const st = tp.steps.map(s => ({ t: chT(s.line, s.ch), to: s.to }));
-    frac = t => { let f = 0; st.forEach(s => { f = f + (s.to - f) * P(t, s.t, s.t + 0.4, E.outC); }); return f; };
-    tDone = st[st.length - 1].t + 0.4;
+    const T = 1.07, A = 0.4 / (1 - Math.exp(-1 / T));
+    frac = t => A * (1 - Math.exp(-Math.max(0, Math.min(t, tDone) - a0) / T));
   }
-  const two = R.length === 2 && tp.mode === 'steps', tR2 = two ? LN[tp.rows[1].line].t0 - 0.05 : 0;
-  sc.measure.push(() => {
-    R.forEach(r => { r.h = r.box.offsetHeight; r.box.style.left = (TPL_GX - 450) + 'px'; });
-    if (two) { R[0].box.style.top = (TPL_Y - R[0].h / 2) + 'px'; R[1].box.style.top = (TPL_Y + 52 - R[1].h / 2) + 'px'; R[0].box.style.transformOrigin = '50% 50%'; }
-    else { const hs = R.map(r => r.h * 0.86), tot = hs[0] + hs[1] + 20; R[0].box.style.top = (TPL_Y - tot / 2 - R[0].h * 0.07) + 'px'; R[1].box.style.top = (TPL_Y - tot / 2 + hs[0] + 20 - R[1].h * 0.07) + 'px'; }
-  });
   tplDone(sc, tDone);
   return t => {
     R.forEach(r => updChars(r.ch, t));
-    if (two) { const k2 = P(t, tR2, tR2 + 0.3, E.outC); R[0].box.style.transform = `translateY(${(-92 * k2).toFixed(1)}px) scale(${(1 - 0.3 * k2).toFixed(4)})`; }
-    const kb = P(t, tB - 0.05, tB + 0.25, E.outC); track.style.transform = `scaleX(${Math.max(0.001, kb).toFixed(4)})`; track.style.opacity = kb > 0.001 ? 1 : 0;
+    const kb = P(t, a0, a0 + 0.3, E.outC); track.style.transform = `scaleX(${Math.max(0.001, kb).toFixed(4)})`; track.style.opacity = kb > 0.001 ? 1 : 0;
     fill.style.width = (W_ * clamp(frac(t))).toFixed(1) + 'px';
   };
 }
@@ -433,26 +454,26 @@ Object.assign(TPL, {
   // 增长（模板三）：变化二「多出来的一截」，灰条是原来的，说到数时右头长出重点色的一截，长度按数算；
   // 变化三「拉开」，两条线从左边同一点出发，灰的平着走，重点色的先贴着、说到那个词往上翘，两条同时到头，右头一道竖线标着中间的空当。
   grow(sc) {
-    const tp = sc.tpl, li = tp.line;
-    if (sc.la !== li || sc.lb !== li + 1 || !tp.rows) return null;
+    const tp = sc.tpl, li = tp.line, f0 = tp.first != null ? tp.first : li;   // 1.3.2：可以带上前一句（f0）
+    if (sc.la !== f0 || sc.lb !== li + 1 || !tp.rows || !['extra', 'rise', 'spread'].includes(tp.var)) return null;
+    if (tp.var === 'extra' && !(+tp.value >= 0.05 && +tp.value <= 9)) return null;
+    if (tp.var === 'rise' && (tp.a0 == null || tp.done == null)) return null;
     sc.hideSubs = true; sc.el.dataset.tpl = 'grow';   // 量帧用
-    const R = tplRows(sc, tp.rows.map(r => Object.assign({ line: li }, r))), GAP = 20;
-    sc.measure.push(() => {
-      const hs = R.map(r => r.box.offsetHeight * 0.86), tot = hs.reduce((a, b) => a + b, 0) + GAP * (R.length - 1);
-      let y = TPL_Y - tot / 2; R.forEach((r, i) => { Object.assign(r.box.style, { top: (y - r.box.offsetHeight * 0.07) + 'px', left: (TPL_GX - 450) + 'px' }); y += hs[i] + GAP; });
-    });
+    const R = gRows(sc, tp.rows, li);
     const textUpd = t => R.forEach(r => updChars(r.ch, t));
+    if (tp.var === 'rise') return trendStroke(sc, R, 1);
     if (tp.var === 'extra') {
-      const v = +tp.value; if (!(v >= 0.05 && v <= 9)) return null;
+      const v = +tp.value;
       const L0 = Math.min(640, 760 / (1 + v)), LX = L0 * v, X0 = TPL_GX - (L0 + LX) / 2, Y = 570, TK = 56;
       const base = el('div', null, null, sc.el, { position: 'absolute', left: X0 + 'px', top: (Y - TK / 2) + 'px', height: TK + 'px', width: '0px', borderRadius: `${TK / 2}px 0 0 ${TK / 2}px`, background: 'var(--sub)' });
       const ext = el('div', null, null, sc.el, { position: 'absolute', left: (X0 + L0) + 'px', top: (Y - TK / 2) + 'px', height: TK + 'px', width: '0px', borderRadius: `0 ${TK / 2}px ${TK / 2}px 0`, background: 'var(--acc)' });
-      const tB = LN[li].t0, tN = chT(li, tp.num), tX = tN + 0.45;
+      base.dataset.tplmark = 1; ext.dataset.tplmark = 1;   // 量帧用
+      const tB = LN[f0].t0, tN = tp.a0 != null ? tp.a0 : chT(li, tp.num) - 0.1, tX = tp.done != null ? tp.done : tN + 0.45;   // 1.3.2：说到那个数才长、最晚在「%」开口时长完（planner 算好）
       tplDone(sc, tX);
       return t => {
         textUpd(t);
         const kb = P(t, tB - 0.05, tB + 0.25, E.outC); base.style.width = (L0 * kb).toFixed(1) + 'px'; base.style.opacity = kb > 0.001 ? 1 : 0;
-        ext.style.width = (LX * P(t, tN, tX, E.outC)).toFixed(1) + 'px';
+        ext.style.width = (LX * P(t, tN, tX, E.outC)).toFixed(1) + 'px'; ext.style.opacity = t > tN ? 1 : 0;
       };
     }
     if (tp.var === 'spread') {
@@ -476,6 +497,57 @@ Object.assign(TPL, {
       };
     }
     return null;
+  },
+  // 下降（1.3.2）：往下的一笔，增长反过来。可以带上前一句
+  drop(sc) {
+    const tp = sc.tpl, li = tp.line, f0 = tp.first != null ? tp.first : li;
+    if (tp.var !== 'fall' || sc.la !== f0 || sc.lb !== li + 1 || !tp.rows || tp.a0 == null || tp.done == null) return null;
+    sc.hideSubs = true; sc.el.dataset.tpl = 'drop';   // 量帧用
+    return trendStroke(sc, gRows(sc, tp.rows, li), -1);
+  },
+  // 排比（1.3.2）：自己一张卡。甲（有共同开头，有些……有些……）：开头在最上面写一遍（110 号、重点色），每条从开头后面写起，一条接一条往下排，说一条出一条，
+  // 左边一根竖线跟着往下长（和普通句卡那根一样）；乙（短句串）：一条前面一个小圆点（重点色），说到这条圆点弹出来。字号、折点照 planner.para_fit（两边一起改）。
+  // 每条出来那一下 0.3 秒，最后一条开口后 0.3 秒出齐，之后原样停住。说过的条不变灰：一组是一起看的。
+  para(sc) {
+    const tp = sc.tpl;
+    if (!tp.parts || !tp.items || !tp.fs || sc.la !== tp.first || sc.lb !== tp.end + 1) return null;
+    sc.hideSubs = true; sc.el.dataset.tpl = 'para';   // 量帧用
+    const fs = tp.fs, X = PARA_X, LH = 1.16, G = Math.round(fs * 0.3), head = tp.var === 'head', DOT = head ? 0 : 0.6 * fs, HH = head ? 110 * LH + 30 : 0;
+    const box = (li, a, b, size, col) => { const x = tplText(sc.el, li, a, b, size, col); Object.assign(x.box.style, { textAlign: 'left', width: 'max-content' }); return x; };
+    const hd = head ? box(tp.line, tp.head[0], tp.head[1], 110, 'var(--acc)') : null;
+    const ps = tp.parts.map(p => { const x = box(p.line, p.a, LN[p.line].cs.length, fs); foldAt(x, p.fold); return Object.assign(x, { p }); });
+    const T = tp.items.map(it => LN[it[0]].t0);
+    const dots = head ? [] : tp.items.map(() => { const d = el('div', null, null, sc.el, { position: 'absolute', width: Math.round(fs * 0.22) + 'px', height: Math.round(fs * 0.22) + 'px', borderRadius: '50%', background: 'var(--acc)', opacity: 0 }); d.dataset.tplmark = 1; return d; });
+    const bar = head ? el('div', null, null, sc.el, { position: 'absolute', left: '96px', top: '0px', width: '14px', height: '0px', background: 'var(--acc)', borderRadius: '7px' }) : null;
+    if (bar) bar.dataset.tplmark = 1;
+    let geo = null;
+    sc.measure.push(() => {
+      const hs = ps.map(x => x.box.offsetHeight), H = HH + hs.reduce((a, h) => a + h, 0) + G * (tp.items.length - 1);
+      let y = Math.max(PARA_TOP, Math.min(PARA_BOT - H, paraCY() - H / 2));
+      if (hd) Object.assign(hd.box.style, { left: X + 'px', top: y + 'px' });
+      y += HH;
+      const top = Array(tp.items.length).fill(null), bot = [];
+      ps.forEach((x, j) => {
+        if (j && x.p.item !== ps[j - 1].p.item) y += G;
+        Object.assign(x.box.style, { left: (X + DOT) + 'px', top: y.toFixed(1) + 'px' });
+        if (top[x.p.item] == null) top[x.p.item] = y;
+        y += hs[j]; bot[x.p.item] = y;
+      });
+      dots.forEach((d, k) => { const s = fs * 0.22; Object.assign(d.style, { left: (X + DOT * 0.3 - s / 2).toFixed(1) + 'px', top: (top[k] + fs * LH * 0.55 - s / 2).toFixed(1) + 'px' }); });
+      geo = { top, bot };
+    });
+    tplDone(sc, T[T.length - 1] + 0.3);   // planner._tpl_time 同一算法
+    return t => {
+      if (hd) updChars(hd.ch, t);
+      ps.forEach(x => updChars(x.ch, t));
+      dots.forEach((d, k) => { const kd = P(t, T[k], T[k] + 0.3, E.outB); d.style.opacity = kd > 0.001 ? 1 : 0; d.style.transform = `scale(${Math.max(0.001, kd).toFixed(4)})`; });
+      if (bar && geo) {
+        let j = -1; T.forEach((x, k) => { if (t >= x) j = k; });
+        if (j < 0) { bar.style.opacity = 0; return; }
+        const from = j ? geo.bot[j - 1] : geo.top[0], h = from + (geo.bot[j] - from) * P(t, T[j], T[j] + 0.3, E.outC) - geo.top[0];
+        Object.assign(bar.style, { top: geo.top[0].toFixed(1) + 'px', height: Math.max(0, h).toFixed(1) + 'px', opacity: h > 0.5 ? 1 : 0 });
+      }
+    };
   },
   // 举例·拎出来（模板六变化一）：整句先照常跳出来；说完后 0.1 秒，被举的词离开原位往下落 150、放大（字高不超过 150）、变重点色，0.4 秒；
   // 留在上面的字缩到七成（11-12 总控令：六成时字高 22 不够 24）、变灰，原位留一个空；一根细竖线（粗 4，灰）把空位和下面的词连起来。只动字，照普通句卡排。
@@ -562,15 +634,15 @@ function sayPara(sc) {
   const ks = KinStack(sc, CYs), bl = ks.blocks;   // 借它造字、算每个字跳出来的时刻；位置和动法这里自己管
   const ls = bl.map((_, k) => LN[sc.la + k]), one = bl.length === 1;
   const W1 = one ? 700 : W, RW = one ? 640 : W;   // 一句的居中：宽 700；排出来的字最宽 640（推近后右边才不过 870），多句的最宽 720
-  let tp = sc.tpl && (sc.tpl.kind === 'ban' || sc.tpl.kind === 'example') ? sc.tpl : null;
+  let tp = sc.tpl && TPL_TEXT.includes(sc.tpl.kind) ? sc.tpl : null;   // 1.3.2：只动字的五种（禁止、举例、注意、打勾、对话框）
   const tk = tp ? tp.line - sc.la : -1, tb = tp && tk >= 0 && tk < bl.length ? bl[tk] : null;
   if (!tb) tp = null;
-  const lim = k => (one ? PARA_ROW1 : PARA_ROW) - (tp && tp.kind === 'ban' && k === tk ? 1 : 0);   // 禁止那句被圈的词两边要让空：一排再少一个字
+  const lim = k => (one ? PARA_ROW1 : PARA_ROW) - (tp && ['ban', 'attn', 'auto', 'quote'].includes(tp.kind) && k === tk ? 1 : 0);   // 禁止、注意、打勾那句的词两边要让空，对话框左右让空：一排再少一个字
   const cuts = ls.map((l, k) => paraCuts(l, lim(k)));
   let fs = paraFont(ls.flatMap((l, k) => paraRows(l, cuts[k])), RW);
-  if (tp && tp.kind === 'ban') {   // 被圈的词前后各让出 0.36 个字的空，圈才不压到旁边的字；那一排连让出的空放不下就把整卡的字缩一点，缩到 90 还放不下就不用模板
-    const bd = [0, ...cuts[tk], ls[tk].cs.length], [o0, o1] = tp.obj, r = bd.findIndex((c, i) => i < bd.length - 1 && c <= o0 && o0 < bd[i + 1]);
-    const row = r >= 0 && o1 <= bd[r + 1] ? paraRows(ls[tk], cuts[tk])[r] : 0;
+  if (tp && ['ban', 'attn', 'auto', 'quote'].includes(tp.kind)) {   // 被圈、被框、打勾的词前后让出空（共 0.72 个字），圈才不压到旁边的字；对话框每排左右各让 0.36。放不下就把整卡的字缩一点，缩到 90 还放不下就不用模板（planner.para_card 同一算法）
+    const bd = [0, ...cuts[tk], ls[tk].cs.length], [o0, o1] = tp.obj || [0, 0], r = bd.findIndex((c, i) => i < bd.length - 1 && c <= o0 && o0 < bd[i + 1]);
+    const row = tp.kind === 'quote' ? Math.max(...paraRows(ls[tk], cuts[tk])) : r >= 0 && o1 <= bd[r + 1] ? paraRows(ls[tk], cuts[tk])[r] : 0;
     const f2 = row ? Math.floor(RW / (row + 0.72)) : 0;
     if (f2 < PARA_MIN) tp = null; else fs = Math.min(fs, f2);
   }
@@ -600,6 +672,25 @@ function sayPara(sc) {
     lift = { key, rest, tL, tL1, DY, thread, g: null };
     tplDone(sc, tL1);
   }
+  // 1.3.2 只动字的另三种。主动作做完的时刻和 planner._text_done 一个算法：被框、打勾的词一开口起笔，最快 0.3 秒、最慢 0.6 秒画完（说完就画完）；停不够时提早，0.3 秒画完。
+  // 注意（1.3.2 改法，11-12 盲审「框错了词」「整句变灰」）：框这句的重点词，别的字不变灰，只把框里的词提亮成框的颜色；提醒类框住（重点色），危险类四个角（坏色）。
+  //   四个角从外面 1.4 倍的地方收到词的四个角上，最后 0.25 秒，到位时越过一点再回来。缩小变灰时词和记号的颜色不褪。方案里的「镜头推近 1.06 倍」没做：新排法整段一起推近，单推一句会和上下几排错开。
+  // 打勾：说到办成的那个词，词右边一笔打个勾（重点色）。对话框：说的那句话一开口，0.3 秒画好一个圆角框把整句框住，左上角一个小尾巴朝上指着说话的人那句。
+  let mark = null;
+  if (tp && (tp.kind === 'attn' || tp.kind === 'auto')) {
+    const li = tp.line, key = tb.ch.slice(tp.key[0], tp.key[1]), at = i => i === 0 || cuts[tk].includes(i);   // at：这个字在一排开头
+    if (tp.kind === 'attn' && !at(tp.key[0])) key[0].e.style.marginLeft = '0.36em';
+    key[key.length - 1].e.style.marginRight = tp.kind === 'auto' ? '0.72em' : '0.36em';
+    const tO0 = chT(li, tp.obj[0]), tO1 = chEnd(li, tp.obj[1] - 1), tS = tp.early ? tO0 + 0.3 : Math.max(tO0 + 0.3, Math.min(tO1, tO0 + 0.6));
+    mark = { kind: tp.kind, key, tO0, tS, bad: tp.var === 'corner', col: tp.var === 'corner' ? 'var(--bad)' : 'var(--acc)', frame: null, cs: null, tick: null };
+    tplDone(sc, tS);
+  }
+  if (tp && tp.kind === 'quote') {
+    Object.assign(tb.box.style, { padding: '0.2em 0.36em', boxSizing: 'border-box' });   // 对话框上下各让 0.2 个字号、左右各让 0.36（planner.para_card 同一算法）
+    const tQ = LN[tp.line].cs[0][1];
+    mark = { kind: 'quote', tO0: tQ, tS: tQ + 0.3, path: null };
+    tplDone(sc, tQ + 0.3);
+  }
   const bar = one ? null : el('div', null, null, sc.el, { position: 'absolute', left: '96px', top: '0px', width: '14px', height: '0px', background: 'var(--acc)', borderRadius: '7px' });
   const ic = sc.icon ? icon(sc.icon, 200, sc.el, { position: 'absolute', left: '0px', top: '0px', opacity: 0, color: 'var(--acc)' }) : null;
   const dw = ic ? drawOn(ic) : null;
@@ -622,6 +713,29 @@ function sayPara(sc) {
       const gh = r0.offsetHeight / 1.16, h = gh + 44, rx = h * 0.38, padX = Math.min(ban.gap - 10, Math.max(30, rx - Math.sqrt(Math.max(0, (rx - 10) ** 2 - (rx - 22) ** 2))));
       const x = r0.offsetLeft - padX, w = r1.offsetLeft + r1.offsetWidth - r0.offsetLeft + padX * 2, y = r0.offsetTop + (r0.offsetHeight - h) / 2;
       Object.assign(ban, banMarks(tb.box, x, y, w, h, rx)); ban.ring.ownerSVGElement.dataset.tplmark = 1;   // 量帧用：主动作的笔画
+    }
+    if (mark && mark.kind === 'attn') {   // 框住：圆角框比词四边各大一点；四个角：四个直角，边长 44，线粗 10
+      const r0 = mark.key[0].e, r1 = mark.key[mark.key.length - 1].e, gh = r0.offsetHeight / 1.16, PD = Math.min(18, Math.round(fs * 0.18));
+      const x = r0.offsetLeft - PD, w = r1.offsetLeft + r1.offsetWidth - r0.offsetLeft + 2 * PD, h = gh + 2 * PD, y = r0.offsetTop + (r0.offsetHeight - h) / 2;
+      const svg = svgBox(tb.box, x, y, w, h); svg.dataset.tplmark = 1;   // 量帧用：主动作的笔画
+      if (!mark.bad) mark.frame = svgEl('rect', { x: 0, y: 0, width: w, height: h, rx: Math.min(24, h / 4), fill: 'none', stroke: mark.col, 'stroke-width': 10 }, svg);
+      else {
+        const L = Math.min(44, h / 2 - 6), at = [[0, 0, 1, 1], [w, 0, -1, 1], [w, h, -1, -1], [0, h, 1, -1]];
+        mark.cs = at.map(([cx, cy, sx, sy]) => ({ cx, cy, e: svgEl('polyline', { points: `0,${sy * L} 0,0 ${sx * L},0`, fill: 'none', stroke: mark.col, 'stroke-width': 10, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg) }));
+        mark.c = [w / 2, h / 2];
+      }
+    }
+    if (mark && mark.kind === 'auto') {   // 勾：词右边，高约半个字，一笔从左往下再往右上
+      const r1 = mark.key[mark.key.length - 1].e, x = r1.offsetLeft + r1.offsetWidth + fs * 0.1, w = fs * 0.52, h = fs * 0.42, y = r1.offsetTop + r1.offsetHeight * 0.5 - h * 0.45;
+      const svg = svgBox(tb.box, x, y, w, h); svg.dataset.tplmark = 1;   // 量帧用
+      mark.tick = svgEl('polyline', { points: `0,${(h * 0.52).toFixed(1)} ${(w * 0.36).toFixed(1)},${h.toFixed(1)} ${w.toFixed(1)},0`, fill: 'none', stroke: 'var(--acc)', 'stroke-width': Math.max(8, Math.round(fs * 0.09)), 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+    }
+    if (mark && mark.kind === 'quote') {   // 对话框：框住整句的字（左右各让 0.36 个字号），上沿左边一个小尾巴朝上
+      let a = 1e9, e = -1e9; tb.ch.forEach(c => { a = Math.min(a, c.e.offsetLeft); e = Math.max(e, c.e.offsetLeft + c.e.offsetWidth); });
+      const x = a - fs * 0.36 + 3, w = e - a + fs * 0.72 - 6, h = tb.box.offsetHeight - 6, y = 3, r = Math.min(fs * 0.3, h / 3), b0 = x + r + fs * 0.12, b1 = b0 + fs * 0.28, th = fs * 0.24;
+      const svg = svgBox(tb.box, 0, 0, 10, 10); svg.dataset.tplmark = 1;   // 量帧用
+      const d = `M${x + r},${y} L${b0},${y} L${b0 - fs * 0.06},${y - th} L${b1},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} L${x + r},${y + h} Q${x},${y + h} ${x},${y + h - r} L${x},${y + r} Q${x},${y} ${x + r},${y} Z`;
+      mark.path = svgEl('path', { d: d.replace(/-?\d+\.\d+/g, v => (+v).toFixed(1)), fill: 'none', stroke: 'var(--acc)', 'stroke-width': 6, 'stroke-linejoin': 'round' }, svg);
     }
     const hs = bl.map(b => b.box.offsetHeight);
     if (lift) {   // 拎下来的词算进这一句的高度：下一句排在它下面，不压上
@@ -663,6 +777,18 @@ function sayPara(sc) {
     if (ban) {   // 否定词一开口变坏色，缩小变灰时也不褪；圈从被禁的词第一个字开口起画，说完合上；再压一道斜杠
       const kc = P(t, ban.tNeg - 0.02, ban.tNeg + 0.15, E.outC); ban.neg.forEach(c => { c.e.style.color = mixC('var(--ink)', 'var(--bad)', kc); });
       if (ban.ring) { dash(ban.ring, P(t, ban.tO0, ban.tRing, E.ioQ)); dash(ban.slash, P(t, ban.tRing, ban.tSl, E.outC)); }
+    }
+    if (mark) {   // 1.3.2 注意、打勾、对话框
+      if (mark.kind === 'attn') {
+        const kc = P(t, mark.tO0 - 0.02, mark.tO0 + 0.15, E.outC); mark.key.forEach(c => { c.e.style.color = mixC('var(--ink)', mark.col, kc); });   // 框里的词提亮，缩小变灰也不褪
+        if (mark.frame) dash(mark.frame, P(t, mark.tO0, mark.tS, E.ioQ));
+        if (mark.cs) {
+          const k = P(t, mark.tS - 0.25, mark.tS, E.lin), s = 1 + 0.4 * (1 - E.outB(k)), [mx, my] = mark.c;
+          mark.cs.forEach(q => { q.e.setAttribute('transform', `translate(${(mx + (q.cx - mx) * s).toFixed(2)} ${(my + (q.cy - my) * s).toFixed(2)})`); q.e.style.opacity = k > 0.001 ? 1 : 0; });
+        }
+      }
+      if (mark.kind === 'auto' && mark.tick) dash(mark.tick, P(t, mark.tO0, mark.tS, E.outC));
+      if (mark.kind === 'quote' && mark.path) dash(mark.path, P(t, mark.tO0, mark.tS, E.ioQ));
     }
     if (lift && lift.g) {   // 说完后 0.1 秒，被举的词往下落 150、放大、变重点色；别的字缩到七成、变灰；一根细竖线连着空位和落下来的词。缩上去以后照样留着
       // 11-12 夜盲审七处之三：这句缩灰时，落下来的词缩回原大、剩下的字回到原样（缩灰以后「淘宝」不比正在说的那句大，剩下的字不小于 72 号）；提早做时字还在冒，冒的动作照算
@@ -744,7 +870,7 @@ const BUILD = {
     };
   },
   say(sc) {
-    const inPara = P12 && sc.tpl && (sc.tpl.kind === 'ban' || sc.tpl.kind === 'example');   // 11-12 夜第二步：只动字的两种接在新排法里
+    const inPara = P12 && sc.tpl && TPL_TEXT.includes(sc.tpl.kind);   // 11-12 夜第二步：只动字的接在新排法里（1.3.2 起五种）
     if (sc.tpl && TPL[sc.tpl.kind] && !inPara) { const f = TPL[sc.tpl.kind](sc); if (f) return f; }   // 认得的记号照模板画，认不得照普通句卡
     sc.hideSubs = true;
     let v = P12 ? 3 : sc.sayN % 3; if (v === 2 && !sc.icon) v = 1;   // 11-12 夜：所有普通句卡一个排法（一句的居中、多句的排成一段），不再三种轮换

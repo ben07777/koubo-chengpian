@@ -20,7 +20,7 @@ import planner
 import shuzi
 from rules import pos_time
 
-VERSION = '1.3.1'
+VERSION = '1.3.2'
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT = '规则'
 TIMEOUT = 95                       # 等中转最多几秒；必须比中转的「总时限秒」（默认 85）长，不然软件先放弃

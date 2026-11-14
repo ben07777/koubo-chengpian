@@ -753,7 +753,7 @@ def para_rows(ln, cuts):
 
 def _para_tpl(sc):
     tp = sc.get('tpl')
-    return tp if tp and tp.get('kind') in ('ban', 'example') else None
+    return tp if tp and tp.get('kind') in TPL_TEXT else None
 
 
 def para_card(lines, a, b, tp=None):
@@ -765,15 +765,18 @@ def para_card(lines, a, b, tp=None):
         keep, m = (), m0
         if tp and tp['line'] == i:
             if tp['kind'] == 'ban': keep, m = [(tp['neg'][0], tp['obj'][1])], m0 - 1
+            elif tp['kind'] in ('attn', 'auto'): keep, m = [tuple(tp['key'])], m0 - 1   # 1.3.2：框、勾要让出空，这句一排少一个字
+            elif tp['kind'] == 'quote': m = m0 - 1                                     # 对话框左右各让出一点
             else: keep = [tuple(tp['key'])]
         c = para_fold(lines[i], m, keep)
         if c is None or (tp and tp['line'] == i and tp['kind'] == 'example' and c): return None
         cuts[i] = c; rows[i] = para_rows(lines[i], c)
     fs = int(max(PARA_FS[0], min(PARA_FS[1], W // max(1e-6, max(max(r) for r in rows.values())))))
-    if tp and tp['kind'] == 'ban':                         # 被圈的词那排连让出的空也得放下
+    if tp and tp['kind'] in ('ban', 'attn', 'auto', 'quote'):   # 被圈、被框、打勾的词那排连让出的空也得放下；对话框每排都让
         li = tp['line']; bd = [0] + cuts[li] + [len(lines[li]['cs'])]
-        o0 = tp['obj'][0]; k = max(j for j in range(len(bd) - 1) if bd[j] <= o0)
-        fs = min(fs, int(W // (rows[li][k] + 0.72)))
+        if tp['kind'] == 'quote': need = max(rows[li]) + 0.72
+        else: o0 = tp['obj'][0]; k = max(j for j in range(len(bd) - 1) if bd[j] <= o0); need = rows[li][k] + 0.72
+        fs = min(fs, int(W // need))
         if fs < PARA_FS[0]: return None
     def height(fs):
         G = round(fs * PARA_GAP); hs = []
@@ -781,6 +784,7 @@ def para_card(lines, a, b, tp=None):
             h = len(rows[i]) * fs * PARA_LH
             if tp and tp['kind'] == 'example' and tp['line'] == i:   # 拎下来的词往下落 150、放大，算进这句的高
                 h1 = fs * PARA_LH; h = max(h, h1 / 2 + 150 + h1 * min(1.5, 150 / fs) / 2 + 6)
+            if tp and tp['kind'] == 'quote' and tp['line'] == i: h += fs * 0.4   # 对话框上下各让 0.2 个字号
             hs.append(h)
         return sum(h * PARA_SHR + G for h in hs[:-1]) + hs[-1]
     H = height(fs)
@@ -837,21 +841,30 @@ def para_fold_line(j, l):
     if c: l['pcut'] = c
 
 
-# ---------- 按意思挂的模板（11-12 夜总控令：这一版只留四种） ----------
-# 方案：画风重做_2026-11-12/说法模板与底色_方案.md 第三、四节。认字眼在这里，画风（seek.js）只照 scenes[].tpl 画，不自己猜。
-# 四种：禁止·圈加斜杠（ban）、举例·拎出来（example）只动字，接在普通句卡新排法里，这句变灰缩小时记号留在原地到卡结束；
-#       时间·圆盘钟点（time）、增长·拉开（grow）带图形，认出的那句单独成卡（就是这张卡最后一句，在它后面换卡）。
-# 一句只用一个，先后是禁止、增长、时间、举例（方案第三节第 11 条；钱、注意这一版不带）。一张卡一个。只挂在普通句卡（say）上。
-# 一条片里每种最多 4 次；紧挨着的两张卡不用同一种；同一个钟点 10 秒内第二遍不用。
-# 停多久（11-12 夜总控改的规矩，时间以「开始淡出」为准，不以换完为准）：
-#   只动字的：主动作做完到这张卡开始淡出不少于 0.5 秒；不为它拖卡，不够就不用。
-#   带图形的：主动作最晚在关键词最后一个字开口时做完；做完到开始淡出不少于 0.8 秒；最多借下一句 0.15 秒；不够就不用。
+# ---------- 按意思挂的模板（1.3.2，11-13 夜总控定十种；钱不单做，钱数照旧走数字卡） ----------
+# 方案：画风重做_2026-11-12/说法模板与底色_方案.md 第三、四节；1.3.2 单子在共用笔记夹「口播成片_1.3.2模板单子_1113.md」。认字眼在这里，画风（seek.js）只照 scenes[].tpl 画，不自己猜。
+# 只动字的（接在普通句卡新排法里，这句变灰缩小时记号留在原地到卡结束）：
+#   禁止·圈加斜杠（ban）、举例·拎出来（example）、注意·框住和四个角（attn）、自动化·打勾（auto）、引话·对话框（quote：框住说出来的那句话）。
+# 带图形的（认出的那句是这张卡最后一句，在它后面换卡）：时间·圆盘钟点和长条（time）、增长·拉开、往上和多出一截（grow）、下降·往下（drop）。
+# 自己一整张卡的：排比（para，三条以上，一张卡）。
+# 一句只用一个，先后是禁止、增长、下降、时间、注意、自动化、举例（方案第三节第 11 条，钱不带）；引话、排比几句一起认，排比那几句里只动字的模板、引话让给排比。
+# 一张卡一个。只挂在普通句卡（say）上。一条片里每种最多 4 次（引话最多 6 次）；紧挨着的两张卡不用同一种；同一个钟点 10 秒内第二遍不用。
+# 停多久（时间以「开始淡出」为准，不以换完为准）：
+#   只动字的：主动作做完到这张卡开始淡出不少于 0.5 秒；这句是卡尾、停不够的，下一张卡可以等那句开口才换（借 0.15 秒，字不比嘴晚；
+#     下一张是数字卡、年份卡、区间卡的不借，它们停不停得够照原来的换卡时刻算）；还不够就不用。不为它拖卡。
+#   带图形的：主动作最晚在关键词最后一个字开口时做完；做完到开始淡出不少于 0.8 秒；不借下一句，下一张卡最晚在那句开口时换（11-13 夜总控：字不许比嘴晚，盖过 11-12 的借 0.15 秒）；不够就不用。
+#   排比：最后一条开口后 0.3 秒出齐，出齐到开始淡出不少于 0.5 秒。
+# 分卡（1.3.2）：连着两句认出同一种带图形的（钟点除外），合成一张卡；带图形的那句，前一句和它是一口气（停不到 0.2 秒）的，一起上这张卡。
 # 卡怎么退（seek.js 卡的进退）：换卡时刻 t1 前 0.26 秒开始淡出，t1 后 0.05 秒退完。
-TPL_FADE, TPL_GONE, TPL_BORROW = 0.26, 0.05, 0.15
-TPL_HOLD = {'ban': 0.5, 'example': 0.5, 'time': 0.8, 'grow': 0.8}
-TPL_GRAPH = ('time', 'grow')
-TPL_MAX = 4
-TPL_NAME = {'ban': '圈加斜杠', 'example': '拎出来', 'time': '圆盘钟点', 'grow': '拉开'}   # 修改页上那颗签的名字（画风登记用）
+TPL_FADE, TPL_GONE, TPL_BORROW, TPL_TBORROW = 0.26, 0.05, 0.0, 0.15   # 带图形的不借（11-13 夜总控，原 0.15）
+TPL_HOLD = {'ban': 0.5, 'example': 0.5, 'attn': 0.5, 'auto': 0.5, 'quote': 0.5, 'para': 0.5, 'time': 0.8, 'grow': 0.8, 'drop': 0.8}
+TPL_GRAPH = ('time', 'grow', 'drop')
+TPL_TEXT = ('ban', 'example', 'attn', 'auto', 'quote')
+TPL_BLOCK = ('para',)
+TPL_NUMCARD = ('stat', 'year', 'range')
+TPL_MAX, TPL_MAXK = 4, {'quote': 6}
+TPL_NAME = {'ban': '圈加斜杠', 'example': '拎出来', 'time': '圆盘钟点', 'grow': '拉开', 'drop': '往下', 'attn': '框住', 'auto': '打勾', 'para': '排比', 'quote': '对话框'}   # 修改页上那颗签的名字（画风登记用）
+TPL_VNAME = {'bar': '长条', 'rise': '往上', 'extra': '多出一截', 'corner': '四个角'}   # 同一种里换了画法的，签上写这个
 BAN_NEG = ('不能', '不许', '不让', '不要', '不准', '禁止', '别')
 BAN_NEVER = ('叫停', '禁止', '限制', '拦住', '不许', '不准', '不让', '不要', '不能')          # 这类词自己就是禁，永远不许被圈
 BAN_SOFT = ('这样', '那样', '这么', '那么', '这个', '那个', '什么', '怎么', '一直', '总是', '老是', '再', '还')
@@ -859,7 +872,11 @@ PARTS = '了啊呀吧呢嘛哈哦啦的'
 PRON = ('你', '我', '他', '她', '它', '咱', '大家', '人家', '别人', '自己')
 EX_PAT = (re.compile(r'(?:就)?拿(.{2,8}?)(?:的例子)?来说([啊呀吧呢嘛哈]*)$'), re.compile(r'以(.{2,8}?)为例([啊呀吧呢嘛哈]*)$'),
           re.compile(r'比如(.{2,8}?)([啊呀吧呢嘛哈]*)$'))
-TPL_RULE = {'正反问': True, '切词边界': True, '语气词收尾': True, '认识的词': True, '区间和小数': True, '不连用': True}   # 「不许用」那几条和不连用，必过考卷的牙一条条单关
+EX_Q = ('一部分', '一些', '这种', '这类', '某些', '某个', '某种')     # 1.3.2：被举的东西前面的数量词去掉再认（拿一部分医药来说 → 医药）
+# 「不许用」那几条、不连用、1.3.2 加的几条，必过考卷的牙一条条单关
+TPL_RULE = {'正反问': True, '切词边界': True, '语气词收尾': True, '认识的词': True, '区间和小数': True, '不连用': True,
+            '否定不算': True, '功能名不算': True, '注意到不算': True, '不是引话': True, '应答不算': True, '至少三个字': True,
+            '两句合一张': True, '带上前一句': True}
 CLOCK_RE = re.compile(r'(早上|上午|中午|下午|傍晚|晚上|凌晨|夜里)(\d{1,2}|[一二两三四五六七八九十]{1,3})点(半|钟)?')
 
 
@@ -946,29 +963,288 @@ def tpl_example(s, tk):
         m = pat.search(s)
         if not m: continue
         a, b = m.span(1); x = m.group(1)
+        q = next((q for q in EX_Q if x.startswith(q)), '')            # 1.3.2：拿一部分医药来说 → 拎「医药」
+        a += len(q); x = x[len(q):]
         if not 2 <= len(x) <= 3 or x.startswith(PRON) or x.startswith('说') or a not in starts or b not in ends: continue
         if TPL_RULE['认识的词'] and not all(_known(w) for a2, b2, w in tk if a <= a2 and b2 <= b): continue
         return dict(kind='example', var='lift', key=[a, b], word=x)
     return None
 
 
+NEG_WIN = 3
+RISE_RE = re.compile(r'涨了|涨到|上涨|增长了|增长到|增加了|提高了|提升了|翻了?一?倍|翻番|越来越(?:多|高|大|贵|快|强)')
+DROP_RE = re.compile(r'跌了|下跌|跌到|暴跌|大跌|下降了?|降了|降到|降价|降低了|减少了|少了一半|缩水|下滑|腰斩')
+DROP_FUNC = ('提醒', '通知', '模式', '功能')
+PCT_RE = re.compile(r'(\d+(?:\.\d+)?)%')
+LONG_RE = re.compile(r'(?:很长|好长|挺长|那么长)(?:的|一段)?时间|太?耗时间|好久|很久|老半天|等了?半天'
+                     r'|(?:持续|坚持)了?(?:好几|十几|几十|好些|几)(?:年|个月|天|小时)|(?:花了?|用了?|等了?|干了?|做了?)(?:好几|十几|几十|好些)(?:年|个月|天|小时)'
+                     r'|^(?:好几|十几|几十)(?:年|个月)$')
+LONG_NOT = ('好久不见', '很久以前', '很久之前', '好久以前', '好久没')
+DANGER_RE = re.compile(r'踩坑|踩雷|有坑|大坑|是个坑|有风险|风险(?:很|太|更|非常|特别)?(?:大|高)|异常|小心|当心|警惕')
+REMIND_RE = re.compile(r'记着|记住|注意|留意')
+ATTN_SKIP = ('这个', '那个', '一下', '一定', '这', '那', '好', '着', '了')
+ATTN_STOP = PRON + BAN_SOFT + ('一下', '一点', '一定', '千万', '我们', '你们', '时候', '的是', '这些', '那些', '就是', '事情', '东西', '事项')
+ATTN_HYPO = ('认定', '如果', '要是', '是否', '若是', '一旦', '假如', '万一')   # 「认定有风险就能叫停」「如果有风险」：假设的话，不是在提醒观众
+AUTO_RE = re.compile(r'(?:帮你|替你|帮我|替我|自动)(?:.{0,6}?)(办好|定好|订好|弄好|搞定|做好|买好|写好|整理好|下好单|找好|安排好|办妥)')
+QUOTE_WHO = r'记者|用户|网友|AI|ai|他|她|你|朋友|老板|客户|医生|老师|助手|有人|对方|专家'
+QUOTE_RE = re.compile(rf'(?:{QUOTE_WHO}).{{0,6}}?(?:问了?(?:{QUOTE_WHO})?|回答(?:{QUOTE_WHO})?说|说)$')
+QUOTE_NOT = ('听说', '就是说', '比如说', '也就是说', '所以说', '怎么说', '再说', '来说', '据说', '可以说', '虽说', '话说', '说说', '不用说', '应该说')
+PARA_ACK = ('对', '是', '好', '行', '嗯', '对对', '是的', '好的', '对吧', '没错', '可以', '对对对', '没问题', '是这样', '就是这样', '没错没错', '好的好的', '可以可以', '是的是的')
+PARA_TAIL = '啊呀呢吧嘛哈哎哦'
+PARA_HEAD_NOT = ('我们', '你们', '他们', '大家', '这个', '那个', '然后', '所以', '但是', '其实', '就是', '因为', '如果', '现在', '今天')   # 甲：拿这些开头的连着三句，多半是在讲经过，不算排比
+PARA_IW, PARA_IROW = 720, 9                      # 排比：一排最宽 720、最多九个字（1.3.2 第二批：和普通句卡一样从 136 排起，右边才不过 870；原 760）
+G_TEXT_H = 350                                   # 带图形的模板，字那块最高（舞台 46 到 396，图形画在下面）：每排高 = 字号 × 1.16 × 0.86，排间 20
+
+
+def _negged(s, a):
+    """a 前面三个字以内有不、没、别（没有上涨、不会再涨、别涨了、没帮你办好）。宁可不出：「不仅收入翻了一倍」也不认。"""
+    return TPL_RULE['否定不算'] and any(c in '不没别' for c in s[max(0, a - NEG_WIN):a])
+
+
+def _g_rows(s, p, acc, line=None):
+    """带图形的模板那句怎么排字（和拉开一个排法）：九个字以内一排；长了从关键词前折，或者按词折，一排最多十个字；字号 72 到 110。排不下返回 None。"""
+    n = len(s)
+    if n <= 9: rows = [(0, n)]
+    elif max(p, n - p) <= 10 and p >= 3: rows = [(0, p), (p, n)]
+    else:
+        c = b_cut(s)
+        if not c or max(c, n - c) > 10: return None
+        rows = [(0, c), (c, n)]
+    size = min(110, int(740 / max(b - a for a, b in rows)))
+    if size < 72: return None
+    out = [dict(a=a, b=b, size=size, acc=[x for x in acc if a <= x[0] < b]) for a, b in rows]
+    return [dict(r, line=line) for r in out] if line is not None else out
+
+
+def _g_fit(rows):
+    """几排字（带图形的模板）统一字号：从各排能用的最小那个往下试，高不过 G_TEXT_H；到 72 还放不下返回 None。"""
+    for sz in range(min(110, min(r['size'] for r in rows)), 71, -1):
+        if sum(sz * PARA_LH * 0.86 for _ in rows) + 20 * (len(rows) - 1) <= G_TEXT_H + 1e-6: return sz
+    return None
+
+
+def _g_merge(lines, f, x):
+    """带图形的模板那张卡带上前面的句子 [f, 认出的那句)：前面的句子各排一到两排（一排最多十个字），排在上面；整卡统一字号。排不下返回 None。"""
+    li = x['line']; rows = []
+    for k in range(f, li):
+        s = _ltxt(lines, k); n = len(s)
+        if n <= 10: rr = [(0, n)]
+        else:
+            c = b_cut(s)
+            if not c or max(c, n - c) > 10: return None
+            rr = [(0, c), (c, n)]
+        rows += [dict(line=k, a=a, b=b, size=min(110, int(740 / (b - a))), acc=[]) for a, b in rr]
+    rows += [dict(r, line=li) for r in x['rows']]
+    sz = _g_fit(rows)
+    return [dict(r, size=sz) for r in rows] if sz else None
+
+
+def _focus(w):
+    """被框的重点词：2 到 4 个汉字、切词工具认识、不是你我他、这个那个这类。"""
+    return 2 <= len(w) <= 4 and re.fullmatch(r'[\u4e00-\u9fff]+', w) and w not in ATTN_STOP and not w.startswith(PRON) and _known(w)
+
+
+def tpl_trend(s, tk, kind):
+    """增长·往上（grow/rise，有百分数的 grow/extra 多出一截）、下降·往下（drop/fall）：涨了、增长了、翻倍、越来越多 / 跌了、下降、减少了、缩水……
+    切词边界上的词才算（投降了的「降了」不算）；前面三个字以内有不、没、别的不认；「降价提醒」这种功能名不认。"""
+    starts = {a for a, _, _ in tk}
+    for m in (RISE_RE if kind == 'grow' else DROP_RE).finditer(s):
+        a, b = m.span()
+        if TPL_RULE['切词边界'] and a not in starts: continue
+        if _negged(s, a): continue
+        if kind == 'drop' and TPL_RULE['功能名不算'] and s[b:b + 2] in DROP_FUNC: continue
+        x = dict(kind=kind, var='rise' if kind == 'grow' else 'fall', start=a, key=[a, b], word=m.group(0))
+        n = PCT_RE.match(s, b) or PCT_RE.match(s, b + 1)
+        if n:
+            x['key'] = [a, n.end()]; x['num'] = n.start()
+            v = float(n.group(1)) / 100
+            if kind == 'grow' and 0.05 <= v <= 9: x.update(var='extra', value=v)
+        rows = _g_rows(s, a, [x['key']])
+        if not rows: return None
+        x['rows'] = rows
+        return x
+    return None
+
+
+def tpl_long(s, tk):
+    """时间·长条（time/bar）：没有确数的久。很长的时间、太耗时间、好久、等了半天、持续几年、整句就是「十几年」。
+    「好久不见」「很久以前」不认；前面三个字以内有不、没、别的不认（不用等很久）。"""
+    if any(w in s for w in LONG_NOT): return None
+    m = LONG_RE.search(s)
+    if not m or _negged(s, m.start()): return None
+    a, b = m.span()
+    rows = _g_rows(s, a, [[a, b]])
+    return dict(kind='time', var='bar', mode='endless', key=[a, b], word=m.group(0), rows=rows) if rows else None
+
+
+def tpl_attn(s, tk):
+    """注意（1.3.2 改法，11-12 盲审「框错了词」「只是记号」）：
+    危险类（踩坑、有坑、有风险、风险大、异常、小心、当心、警惕）四个角、坏色，框危险的那个词；「小心骗子」框「骗子」，小心后面没有词的不认；
+    「小心翼翼」「不小心」「没有风险」「异常值」「异常检测」不认。
+    提醒类（记着、记住、注意、留意）框这句的重点词，不框「记着」本身：「这个细节大家记着」框「细节」，「注意安全」框「安全」；找不到重点词的（别高兴太早）不出；
+    「注意到」（看见了）「注意力」「记住了」不认。"""
+    starts = {a for a, _, _ in tk}; ends = {b for _, b, _ in tk}
+    m = DANGER_RE.search(s)
+    if m:
+        a, b = m.span(); w = m.group(0)
+        if (a in starts or not TPL_RULE['切词边界']) and not _negged(s, a) and s[b:b + 1] not in ('翼', '值', '检', '测') and not any(h in s[max(0, a - 4):a] for h in ATTN_HYPO):
+            key = None
+            if w in ('小心', '当心', '警惕'):
+                ob = next(((p, q, x) for p, q, x in tk if p == b), None)
+                if ob and _focus(ob[2]): key = [ob[0], ob[1]]
+            elif '风险' in w: p = s.find('风险', a); key = [p, p + 2]
+            else: key = [a, b]
+            if key: return dict(kind='attn', var='corner', color='bad', key=key, obj=key, word=s[key[0]:key[1]])
+    m = REMIND_RE.search(s)
+    if not m: return None
+    a, b = m.span()
+    if TPL_RULE['切词边界'] and a not in starts: return None
+    if TPL_RULE['注意到不算'] and s[b:b + 1] in ('到', '力', '了', '的'): return None   # 「需要大家注意的是」要注意的在下一句，这句不框
+    toks = list(tk); key = None
+    q = next((q for p, q, x in toks if p == a), b)
+    if q > b:                                              # 「注意安全」切词切成一个词：框后半「安全」
+        return dict(kind='attn', var='frame', color='acc', key=[b, q], obj=[b, q], word=s[b:q]) if _focus(s[b:q]) else None
+    for j, (p, q, x) in enumerate(toks):                   # 这个细节大家记着：「这个」「这」后面紧跟的那个词
+        if q <= a and x in ('这个', '那个', '这', '那') and j + 1 < len(toks) and toks[j + 1][1] <= a and _focus(toks[j + 1][2]):
+            key = [toks[j + 1][0], toks[j + 1][1]]
+    if not key:                                            # 注意安全、记住这一点：动词后面那个词（跳过这个、一下、一定）
+        for p, q, x in toks:
+            if p < b: continue
+            if x in ATTN_SKIP: continue
+            if _focus(x): key = [p, q]
+            break
+    return dict(kind='attn', var='frame', color='acc', key=key, obj=key, word=s[key[0]:key[1]]) if key else None
+
+
+def tpl_auto(s, tk):
+    """自动化·打勾：帮你、替你、帮我、自动……后面六个字以内跟着办成了的词（办好、定好、搞定、做好、买好……），在这个词旁边打勾。
+    只说「帮你找」、没说办成的不认（不知道办成了什么，画不出）；前面三个字以内有不、没、别的不认（没帮你办好）。"""
+    m = AUTO_RE.search(s)
+    if not m or _negged(s, m.start()) or _negged(s, m.start(1)): return None
+    a, b = m.span(1)
+    return dict(kind='auto', var='tick', key=[a, b], obj=[a, b], word=m.group(1))
+
+
+def quote_src(s):
+    """这句是不是在引一个人的话：以「说、问、问了、回答说」收尾（后面只剩语气字），前面六个字以内有说话的人（记者、用户、AI、你、他……）。
+    「听说、就是说、比如说、对你来说」这类不是引话。"""
+    s = re.sub(r'[啊呀呢吧嘛哈哎]+$', '', s)
+    if TPL_RULE['不是引话'] and s.endswith(QUOTE_NOT): return False
+    return bool(QUOTE_RE.search(s))
+
+
+def _bare(t): return re.sub(f'[{PARA_TAIL}]+$', '', t)
+
+
+def _para_short(T, k):
+    t = _bare(T[k])
+    return ((3 if TPL_RULE['至少三个字'] else 1) <= len(t) <= 5 and not (TPL_RULE['应答不算'] and t in PARA_ACK)
+            and not quote_src(T[k]) and not t.startswith('比如'))
+
+
+def para_fit(lines, g):
+    """排比那张卡怎么排（和 seek.js 的排比一个算法，两边一起改）。
+    甲（head）：共同的开头在最上面写一遍（字号 110，下面空 30），每条从开头和开头后面的语气字以后写起；接着说的句子（停不到 0.2 秒）接在那条下面。
+    乙（dots）：每句一条，前面一个小圆点（占 0.6 个字宽）。
+    每句按词折，一排最多九个字、最宽 720；整卡字号 72 到 110 取放得下的最大；条与条之间空 0.3 个字号；高不过 694。放不下返回 None。
+    返回 parts：每句 (line, a 从第几个字起写, fold 折点, item 第几条)；fs 字号。"""
+    parts, wid = [], []
+    dot = 0.6 if g['var'] == 'dots' else 0.0
+    for n_it, it in enumerate(g['items']):
+        for j, k in enumerate(it):
+            cs = lines[k]['cs']; a = 0
+            if g['var'] == 'head' and j == 0:
+                a = 2
+                while a < len(cs) and cs[a][0] in PARA_TAIL: a += 1
+            sub = dict(cs=cs[a:], kw='')
+            if not sub['cs']: return None
+            c = para_fold(sub, PARA_IROW - dot)
+            if c is None: return None
+            parts.append(dict(line=k, a=a, fold=c, item=n_it)); wid += [w + dot for w in para_rows(sub, c)]
+    head = 110 * PARA_LH + 30 if g['var'] == 'head' else 0.0
+
+    def height(fs):
+        return head + sum((len(p['fold']) + 1) * fs * PARA_LH for p in parts) + round(fs * PARA_GAP) * (len(g['items']) - 1)
+    fs = int(max(72, min(110, PARA_IW // max(wid))))
+    while fs > 72 and height(fs) > PARA_HMAX: fs -= 1
+    return dict(parts=parts, fs=fs) if height(fs) <= PARA_HMAX else None
+
+
+def _para_at(lines, T, ok, i):
+    n = len(lines); h = T[i][:2]
+    for var in ('head', 'dots'):
+        if var == 'head' and not (len(T[i]) >= 4 and re.fullmatch(r'[\u4e00-\u9fff]{2}', h) and h not in PARA_HEAD_NOT): continue
+        if var == 'dots' and not _para_short(T, i): continue
+        same = (lambda k: T[k][:2] == h and len(T[k]) >= 4) if var == 'head' else (lambda k: _para_short(T, k))
+        items, k = [[i]], i + 1
+        while k < n and ok(k):
+            if same(k) and (var == 'head' or _gap(lines, k - 1) >= 0.4 - 1e-9): items.append([k])
+            elif _gap(lines, k - 1) < GAP_KEEP - 1e-9:
+                if var == 'head': items[-1].append(k)
+                else: items.append([k])                      # 乙：接着说的也算一条（鞋带一拧就紧的越野跑鞋）
+            else: break
+            k += 1
+        while sum(map(len, items)) > CARD_MAX: items.pop()   # 一组最多四句（一张卡），多了从后面整条去掉
+        if sum(1 for it in items if same(it[0])) < 3: continue
+        g = dict(kind='para', var=var, line=i, first=i, end=items[-1][-1], items=items, head=[0, 2] if var == 'head' else None,
+                 word=h if var == 'head' else _bare(T[i]))
+        fit = para_fit(lines, g)
+        if fit: return dict(g, **fit)
+    return None
+
+
+def para_find(lines, T, ok):
+    """排比：甲，连着三句开头两个字一样（有些……有些……有些……），每句至少四个字；乙，连着三句以上，每句 3 到 5 个字（去掉句尾语气字），
+    句间停顿都不少于 0.4 秒，不是「对、是、好、没错」这类应答，不是「比如你说」这种引话的头。中间、后面停不到 0.2 秒接着说的句子一起进卡。
+    一组最多四句（一张卡）。ok(i)：这句在普通句卡上、能挂模板。返回 {第一句: 记号}。"""
+    out, i = {}, 0
+    while i < len(lines):
+        g = _para_at(lines, T, ok, i) if ok(i) else None
+        if g: out[i] = g; i = g['end'] + 1
+        else: i += 1
+    return out
+
+
 def tpl_line(s, tk):
-    for f in (tpl_ban, tpl_grow, tpl_clock, tpl_example):
+    for f in (tpl_ban, tpl_grow, lambda s, tk: tpl_trend(s, tk, 'grow'), lambda s, tk: tpl_trend(s, tk, 'drop'), tpl_clock, tpl_long, tpl_attn, tpl_auto, tpl_example):
         x = f(s, tk)
         if x: return x
     return None
 
 
 def tpl_find(scenes, lines, T):
-    """普通句卡里每句认模板（一句只认一种）。"""
+    """普通句卡里每句认模板（一句只认一种）；再认引话（上一句是「谁说」，这句是他说的话）和排比（几句一组）；带图形的按两条分卡规矩带上前面的句子。
+    返回 {锚句: 记号}：一句的记号锚在这句；带图形的合卡后锚在认出的那句（first 记最前面那句）；排比锚在第一句（first、end 记第一句、最后一句）。"""
+    say = {i for sc in scenes if sc['type'] == 'say' for i in range(sc['la'], sc['lb'])}
+    txt = lambda i: ''.join(c[0] for c in lines[i]['cs'])
+    ok = lambda i: i in say and not any(len(c[0]) != 1 for c in lines[i]['cs']) and not Q_RE.search(T[i])
     found = {}
-    for sc in scenes:
-        if sc['type'] != 'say': continue
-        for i in range(sc['la'], sc['lb']):
-            cs = lines[i]['cs']
-            if any(len(c[0]) != 1 for c in cs) or Q_RE.search(T[i]): continue
-            s = ''.join(c[0] for c in cs); x = tpl_line(s, _toks(s))
-            if x: found[i] = dict(x, line=i)
+    for i in sorted(say):
+        if not ok(i): continue
+        s = txt(i); x = tpl_line(s, _toks(s))
+        if x: found[i] = dict(x, line=i)
+    for i in sorted(say):                                  # 引话：上一句是「谁说」，这句就是他说的话，套对话框
+        if i in found or i == 0 or not ok(i) or not quote_src(txt(i - 1)): continue
+        s = txt(i); found[i] = dict(kind='quote', var='bubble', line=i, src=i - 1, key=[0, len(s)], word=s)
+    for f, g in para_find(lines, T, ok).items():          # 排比：几句里有带图形的就不认；只动字的、引话让给排比
+        mem = range(g['first'], g['end'] + 1)
+        if any(k in found and found[k]['kind'] in TPL_GRAPH for k in mem): continue
+        for k in mem: found.pop(k, None)
+        found[f] = g
+    for i in sorted(found):                                # 两条分卡规矩（钟点那种不合）
+        x = found.get(i)
+        if not x or x['kind'] not in TPL_GRAPH or x.get('var') == 'clock': continue
+        p, y = i - 1, found.get(i - 1)
+        if y and TPL_RULE['两句合一张'] and y['kind'] == x['kind'] and y.get('var') == x.get('var') and 'first' not in y and p in say:
+            r = _g_merge(lines, p, x)
+            if r:
+                for rw in r:                               # 前一句自己的词也用重点色；长条说到前一句的词先走一段（seek.js timeBar 用 pkey）
+                    if rw['line'] == p: rw['acc'] = [[max(rw['a'], y['key'][0]), min(rw['b'], y['key'][1])]] if y['key'][0] < rw['b'] and y['key'][1] > rw['a'] else []
+                found[i] = dict(x, first=p, rows=r, pkey=list(y['key'])); del found[p]
+            continue
+        if TPL_RULE['带上前一句'] and p in say and p not in found and _gap(lines, p) < GAP_KEEP - 1e-9:
+            r = _g_merge(lines, p, x)
+            if r: found[i] = dict(x, first=p, rows=r)
     return found
 
 
@@ -1048,33 +1324,43 @@ def _text_done(lines, x, early):
     li = x['line']; cs = lines[li]['cs']
     chT = lambda i: cs[min(i, len(cs) - 1)][1]
     chEnd = lambda i: cs[i + 1][1] if i + 1 < len(cs) else lines[li]['t1']
-    if x['kind'] == 'ban':
+    if x['kind'] in ('ban', 'attn', 'auto'):
         tO0, tO1 = chT(x['obj'][0]), chEnd(x['obj'][1] - 1)
-        stroke = (tO0 + 0.3 if early else max(tO0 + 0.3, min(tO1, tO0 + 0.6))) + 0.12   # 提早：被圈的词一开口起笔，0.3 秒合上，不等它说完
+        stroke = (tO0 + 0.3 if early else max(tO0 + 0.3, min(tO1, tO0 + 0.6))) + (0.12 if x['kind'] == 'ban' else 0.0)   # 提早：被圈的词一开口起笔，0.3 秒合上，不等它说完；禁止再压 0.12 秒斜杠
+    elif x['kind'] == 'quote':
+        stroke = lines[li]['cs'][0][1] + 0.3                                            # 对话框：说的那句话一开口，0.3 秒框好
     else:
         stroke = (chT(x['key'][0]) if early else lines[li]['t1'] + 0.1) + 0.4          # 提早：被举的词一开口就往下拎，不等整句说完
     return stroke, stroke
 
 
-def _text_hold(lines, x, y, t1):
-    """只动字的模板挂在卡 [.., y) 上（换卡时刻 t1）停不停得够：先照常，不够再提早。够了返回 (提早没有, 最后一笔, 做完, 停到)，不够返回 None。"""
-    li = x['line']; end = t1 - TPL_FADE
-    if li + 1 < y: end = min(end, lines[li + 1]['cs'][0][1] - 0.07)   # 同一张卡下一句冒头，这句就开始缩小变灰
-    for early in (False, True):
-        stroke, done = _text_done(lines, x, early)
-        if _fr_after(end) - _fr_up(done) >= TPL_HOLD[x['kind']] + TPL_MARGIN - 1e-6: return early, stroke, done, end
+def _text_hold(lines, x, y, t1, borrow=0.0, cap=None):
+    """只动字的模板挂在卡 [.., y) 上（换卡时刻 t1）停不停得够：先照常，不够再提早；这句是卡尾的，再让下一张卡晚换 borrow 秒（不晚过 cap，就是下一句开口）。
+    够了返回 (提早没有, 最后一笔, 做完, 停到, 借了多少)，不够返回 None。"""
+    li = x['line']; bs = [0.0]
+    if borrow > 0 and li + 1 >= y and cap is not None and cap - t1 > 1e-6: bs.append(min(borrow, cap - t1))   # 1.3.2：下一张卡等那句开口才换
+    for bo in bs:
+        end = t1 + bo - TPL_FADE
+        if li + 1 < y: end = min(end, lines[li + 1]['cs'][0][1] - 0.07)   # 同一张卡下一句冒头，这句就开始缩小变灰
+        for early in (False, True):
+            stroke, done = _text_done(lines, x, early)
+            if _fr_after(end) - _fr_up(done) >= TPL_HOLD[x['kind']] + TPL_MARGIN - 1e-6: return early, stroke, done, end, bo
     return None
 
 
-def _graph_ok(lines, i, a, b):
-    """带图形的模板那句单独成卡：它前后换卡也得守分卡的规矩（前后停顿都不少于 0.3 秒；后面那句当卡头，不短于四个字、不拿「的了呢」开头）。"""
+def _block_ok(lines, f, e, a, b):
+    """带图形的模板、排比那几句 [f, e] 自己一张卡：它前后换卡也得守分卡的规矩。一句一张的，前后停顿都不少于 0.3 秒（11-13 补）；
+    几句一张的（1.3.2 合卡、排比），前后停顿不少于 0.2 秒；后面那句当卡头，不短于四个字、不拿「的了呢」开头。"""
     if not ('句卡' in FIXES and CARD_RULE['看停顿']): return True
-    if CARD_RULE['单句要停顿'] and min(_gap(lines, i - 1), _gap(lines, i)) < GAP_ONE - 1e-9: return False   # 单独一句居中的卡：前后停顿都不少于 0.3 秒（11-13 补：带图形的模板卡也是一句一张）
-    if i > a and _gap(lines, i - 1) < GAP_KEEP - 1e-9: return False
-    if i + 1 < b:
-        h = _ltxt(lines, i + 1)
-        if _gap(lines, i) < GAP_KEEP - 1e-9 or _nch(h) < HEAD_MIN or h[:1] in HEAD_BAD: return False
+    if f == e and CARD_RULE['单句要停顿'] and min(_gap(lines, f - 1), _gap(lines, f)) < GAP_ONE - 1e-9: return False
+    if f > a and _gap(lines, f - 1) < GAP_KEEP - 1e-9: return False
+    if e + 1 < b:
+        h = _ltxt(lines, e + 1)
+        if _gap(lines, e) < GAP_KEEP - 1e-9 or _nch(h) < HEAD_MIN or h[:1] in HEAD_BAD: return False
     return True
+
+
+def _graph_ok(lines, i, a, b): return _block_ok(lines, i, i, a, b)
 
 
 def cards_build(base, lines, T, dur, found, skip):
@@ -1083,7 +1369,7 @@ def cards_build(base, lines, T, dur, found, skip):
     import copy
     new = '句卡' in FIXES and CARD_RULE['看停顿']
     S, rej, last_kind, cnt, clocks, fc = [], set(), None, {}, [], {}
-    tp_of = lambda x, y: next((found[i] for i in range(x, y) if i in found and i not in skip and found[i]['kind'] not in TPL_GRAPH), None)
+    tp_of = lambda x, y: next((found[i] for i in range(x, y) if i in found and i not in skip and found[i]['kind'] in TPL_TEXT), None)
 
     def fits(x, y):
         if not PARA_RULE['拆卡']: return True                   # 量牙用：不管装不装得下都不拆
@@ -1092,7 +1378,7 @@ def cards_build(base, lines, T, dur, found, skip):
             fc[(x, y)] = r[2] <= PARA_HMAX
         return fc[(x, y)]
     t1_of = lambda y: lines[y]['t0'] - 0.15 if y < len(lines) else dur
-    extra = lambda x, y: 0.0 if not tp_of(x, y) or _text_hold(lines, tp_of(x, y), y, t1_of(y)) else TPL_MISS
+    extra = lambda x, y: 0.0 if not tp_of(x, y) or _text_hold(lines, tp_of(x, y), y, t1_of(y), TPL_TBORROW if y < len(lines) else 0.0, lines[y]['t0'] if y < len(lines) else None) else TPL_MISS
     k = 0
     while k < len(base):
         sc = base[k]; k += 1
@@ -1102,12 +1388,11 @@ def cards_build(base, lines, T, dur, found, skip):
         if new:
             while k < len(base) and base[k]['type'] == 'say' and base[k]['la'] == b: b = base[k]['lb']; k += 1
         pieces, p = [], a
-        for i in range(a, b):
-            x = found.get(i)
-            if x and i not in skip and x['kind'] in TPL_GRAPH:
-                if not _graph_ok(lines, i, a, b): rej.add(i); continue
-                if p < i: pieces.append((p, i, None))
-                pieces.append((i, i + 1, x)); p = i + 1
+        own = sorted((found[i].get('first', i), found[i].get('end', i), i) for i in found if a <= i < b and i not in skip and found[i]['kind'] not in TPL_TEXT)
+        for f, e, i in own:                                   # 带图形的、排比：自己一张卡（1.3.2：可以是几句）
+            if f < max(a, p) or e >= b or not _block_ok(lines, f, e, a, b): rej.add(i); continue
+            if p < f: pieces.append((p, f, None))
+            pieces.append((f, e + 1, found[i])); p = e + 1
         if p < b: pieces.append((p, b, None))
         parts = []
         for p, q, x in pieces:
@@ -1117,16 +1402,16 @@ def cards_build(base, lines, T, dur, found, skip):
             else: parts.append((p, q, None))
         for p, q, x in parts:
             c = dict(type='say', la=p, lb=q, icon=scene_icon(''.join(T[p:q])))
-            graph = bool(x)
+            own = x
             if not x:                                             # 只动字的：这张卡里第一句认出来的
                 x = tp_of(p, q)
                 if x and '句卡' in FIXES and para_card(lines, p, q, x) is None: x = None   # 模板那句折不全（被圈的词和否定词不在一排、举例那句一排放不下）
-            if x and (cnt.get(x['kind'], 0) >= TPL_MAX or (TPL_RULE['不连用'] and last_kind == x['kind'])): x = None
-            if x and x['kind'] == 'time' and any(h == x['hour'] and lines[x['line']]['t0'] - t < 10 for h, t in clocks): x = None
-            if graph and not x: rej.add(p)                         # 带图形的已经单独成卡却挂不上：这句不用模板，重排
+            if x and (cnt.get(x['kind'], 0) >= TPL_MAXK.get(x['kind'], TPL_MAX) or (TPL_RULE['不连用'] and last_kind == x['kind'])): x = None
+            if x and x.get('var') == 'clock' and any(h == x['hour'] and lines[x['line']]['t0'] - t < 10 for h, t in clocks): x = None
+            if own and not x: rej.add(own['line'])                 # 带图形的、排比已经自己一张卡却挂不上：这句不用模板，重排
             if x:
                 c['tpl'] = copy.deepcopy(x); c['icon'] = None; cnt[x['kind']] = cnt.get(x['kind'], 0) + 1
-                if x['kind'] == 'time': clocks.append((x['hour'], lines[x['line']]['t0']))
+                if x.get('var') == 'clock': clocks.append((x['hour'], lines[x['line']]['t0']))
             last_kind = x['kind'] if x else None
             S.append(c)
     return S, rej
@@ -1143,26 +1428,40 @@ def _tpl_time(S, lines, dur):
         li = x['line']; nxt = S[k + 1] if k + 1 < len(S) else None
         settle = lines[li]['cs'][-1][1] + 0.32
         if x['kind'] in TPL_GRAPH:
-            cap = (lines[nxt['la']]['t0'] + TPL_BORROW) if nxt else dur          # 最多借到下一句开口后 0.15 秒
+            cap = (lines[nxt['la']]['t0'] + TPL_BORROW) if nxt else dur          # 下一张卡最晚在下一句开口时换（TPL_BORROW 现为 0，字不比嘴晚）
             hold = TPL_HOLD[x['kind']] + TPL_MARGIN
             latest = _fr_up(cap - TPL_FADE - hold) - 1.0 / FPS                  # 做完最晚这一帧，才够停（按帧算再多留一帧）
-            if x['kind'] == 'time':
+            v = x.get('var')
+            if v == 'clock':
                 done = min(chT(li, x['key'][1] - 1), latest)                     # 最晚在关键词最后一个字开口时
                 h0 = min(chT(li, x['digit']) - 0.10, done - 0.25)                # 短针从那个数开口前 0.1 秒起转，至少转 0.25 秒
                 if h0 < sc['t0'] or done <= sc['t0']: bad.add(li); continue
                 x['h0'] = round(h0, 3)
-            else:
+            elif v == 'spread':
                 t_s = chT(li, x['start']) - 0.10; t_u = chT(li, x['up'])
                 done = min(chT(li, x['last']), latest)
                 if done < t_u + 0.3 or done - t_s < 0.6: bad.add(li); continue
+            else:                                                                # 1.3.2 长条、往上、多出一截、往下：从 a0 动到做完，至少动 0.3 秒
+                if v == 'bar': a0 = max(sc['t0'], lines[x.get('first', li)]['t0'] - 0.05)          # 长条：卡上第一句开口就开始走
+                elif v == 'extra': a0 = max(sc['t0'] + 0.1, chT(li, x['num']) - 0.1)              # 多出一截：说到那个数才长
+                else: a0 = max(sc['t0'] + 0.1, chT(li, x['key'][0]) - 0.4)                        # 往上、往下的一笔：关键词开口前 0.4 秒起笔
+                done = min(chT(li, x['key'][1] - 1), latest)
+                if done - a0 < 0.3 - 1e-6: bad.add(li); continue
+                x['a0'] = round(a0, 3)
             need = done + hold + TPL_FADE
             if need > sc['t1'] + 1e-6:
                 sc['t1'] = round(need, 3)
                 if nxt: nxt['t0'] = sc['t1']
+        elif x['kind'] in TPL_BLOCK:                                             # 排比：最后一条开口后 0.3 秒出齐，停够 0.5 秒
+            done = lines[x['items'][-1][0]]['t0'] + 0.3
+            if _fr_after(sc['t1'] - TPL_FADE) - _fr_up(done) < TPL_HOLD[x['kind']] + TPL_MARGIN - 1e-6: bad.add(li); continue
         else:
-            r = _text_hold(lines, x, sc['lb'], sc['t1'])
+            bor = TPL_TBORROW if nxt and nxt['type'] not in TPL_NUMCARD else 0.0   # 1.3.2：下一张是数字卡、年份卡、区间卡的不借
+            r = _text_hold(lines, x, sc['lb'], sc['t1'], bor, lines[nxt['la']]['t0'] if nxt else None)
             if r is None: bad.add(li); continue
             x['early'], x['stroke'], done, x['hold_to'] = r[0], round(r[1], 3), r[2], round(r[3], 3)
+            if r[4] > 1e-9:                                                       # 借了：下一张卡等那句开口才换
+                sc['t1'] = round(sc['t1'] + r[4], 3); nxt['t0'] = sc['t1']; x['borrow'] = round(r[4], 3)
         x['done'] = round(done, 3); x['settle'] = round(settle, 3); x['fade'] = round(sc['t1'] - TPL_FADE, 3); x['gone'] = round(sc['t1'] + TPL_GONE, 3)
     return bad
 
