@@ -4,6 +4,7 @@
 # 中间帧用 PNG 还是 JPEG，由画风.json 的「中间帧」声明（字卡 jpeg 92，跳字、夜路 jpeg 95；声明 png 就逐帧走无损，画布类画风慢约四倍）。
 # 一条命令出片：python app/render.py 剧本.json --画风 跳字 --出 成片.mp4 [--声音 mix.wav] [--配色 night]
 import asyncio, json, os, shutil, subprocess, sys, time
+NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)      # 11-20：软件改成不开黑框跑以后，调 ffmpeg 别每次闪一个黑框（Windows 才有这个开关，别处是 0）
 from urllib.parse import urlsplit
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -67,18 +68,53 @@ def page_data(juben_json, opts=None):
     return 'window.JUBEN=' + json.dumps(j, ensure_ascii=False) + ';window.OPTS=' + json.dumps(opts or {}, ensure_ascii=False) + ';'
 
 
+def is_pro(juben_json):
+    """这份剧本是不是专业版排的（开了云端排画面、云端也回了话）。读不出来、不是剧本，一律当不是。"""
+    try: return str(juben_json).endswith('.json') and json.loads(Path(juben_json).read_text(encoding='utf-8')).get('writer') == 'AI'
+    except Exception: return False
+
+
+def pro_seek(sd):
+    """专业版的片子用的 seek.js：原文件后面接上「专业版」文件夹里的几份脚本（按文件名先后），现场拼、不落盘。
+    免费版的片子不走这里，拿到的还是原文件，一个字不变。原文件只动一处：小画面上已经写着的那句，底下的字幕让一让。"""
+    src = (sd / 'seek.js').read_text(encoding='utf-8')
+    i = src.rindex('\nPromise.all(')
+    js = src[:i] + '\n' + ''.join(f.read_text(encoding='utf-8') + '\n' for f in sorted((sd / '专业版').glob('*.js'))) + src[i:]
+    hook = "    SUB.forEach((s, i) => {\n      const on = i === act;"
+    if js.count(hook) != 1: raise RuntimeError('专业版的画面脚本接不上（seek.js 和专业版文件夹对不上），请把软件重新解压一次。')
+    return js.replace(hook, "    if (act >= 0 && cur.hideLines && cur.hideLines.has(act)) act = -1;\n" + hook)
+
+
+def look_of(juben_json, style='字卡', opts=None):
+    """这条片子用哪套「样子」画（app/yangzi.py，2026-11-16）。只有专业版的片子、走字卡这条路、参数里又点了名的才有；别的一律回 None，照原来的画。"""
+    lk = (opts or {}).get('样子')
+    if not lk or style != '字卡' or not is_pro(juben_json): return None
+    import yangzi
+    return lk if lk in yangzi.LOOKS else None
+
+
 async def _open(p, slot, juben_json, w=1080, h=1920, style='字卡', opts=None):
     # 为本次渲染提供最小虚拟页面。不启动网站，不放宽浏览器的文件或跨域保护。
     sd = STYLES / style
     meta = style_meta(style)
+    pro = pro_seek(sd) if style == '字卡' and (sd / '专业版').is_dir() and is_pro(juben_json) else None   # 专业版（2026-11-15）：只有云端排的片子才接上专业版的脚本
     allowed = {"/page.html": COMMON / "页面.html", "/core.js": COMMON / "core.js", "/icons.js": COMMON / "icons.js", "/seek.js": sd / "seek.js"}
     if meta.get("样式"): allowed["/style.css"] = sd / meta["样式"]
     allowed.update({"/fonts/"+f.name:f for f in (COMMON/"fonts").iterdir() if f.is_file()})
     data = page_data(juben_json, opts)
+    lk = look_of(juben_json, style, opts); yz = None
+    if lk:                                                 # 专业版换了样子的片子：视频画面那一页换成这套样子自己拼的；封面那一页（网址带 cover=）照旧是字卡
+        import yangzi
+        yz = yangzi.page(juben_json, lk)
     async def serve(route):
         uri=urlsplit(route.request.url)
+        if yz is not None and uri.netloc == "127.0.0.1" and "cover=" not in uri.query:
+            if uri.path == "/page.html": return await route.fulfill(body=yz[0], content_type="text/html; charset=utf-8")
+            if uri.path in yz[1]: return await route.fulfill(path=yz[1][uri.path])
         if uri.netloc == "127.0.0.1" and uri.path == "/data.js":
             return await route.fulfill(body=data, content_type="text/javascript; charset=utf-8")
+        if uri.netloc == "127.0.0.1" and uri.path == "/seek.js" and pro is not None:
+            return await route.fulfill(body=pro, content_type="text/javascript; charset=utf-8")
         if uri.netloc == "127.0.0.1" and uri.path == "/style.css" and "/style.css" not in allowed:
             return await route.fulfill(body="", content_type="text/css")
         file=allowed.get(uri.path)
@@ -115,9 +151,15 @@ async def _seg(juben_json, out, fps, n0, n1, slot, progress=None, style='字卡'
             Path(drawn).write_text(json.dumps(await pg.evaluate('window.DRAWN || null'), ensure_ascii=False), encoding='utf-8')
         kind, q = frame_kind(style)
         shot = dict(type='png') if kind == 'png' else dict(type='jpeg', quality=q)
+        cap = []                                               # 只有点了名要封顶的样子才封（全息）；免费版和别的样子这里是空的，压片参数一个字不变
+        lk = look_of(juben_json, style, opts)
+        if lk:
+            import yangzi
+            kb = yangzi.CAP_KBPS.get(lk)
+            if kb: cap = ['-maxrate', f'{kb}k', '-bufsize', f'{kb * 2}k']
         ff = subprocess.Popen([ffmpeg(), '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', str(fps), '-c:v', 'png' if kind == 'png' else 'mjpeg', '-i', '-',
-                               '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', str(fps), str(out)],
-                              stdin=subprocess.PIPE)
+                               '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', *cap, '-pix_fmt', 'yuv420p', '-r', str(fps), str(out)],
+                              stdin=subprocess.PIPE, creationflags=NOWIN)
         for n in range(n0, n1):
             await pg.evaluate(f'seek({n / fps})')
             ff.stdin.write(await pg.screenshot(**shot))
@@ -142,7 +184,7 @@ def render_video(juben_json, dur, out_mp4, fps=30, workers=2, progress=None, sty
     asyncio.run(main())
     lst = tmp / 'list.txt'; lst.write_text(''.join(f"file '{s.name}'\n" for s in segs), encoding='utf-8')
     r = subprocess.run([ffmpeg(), '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(out_mp4)],
-                       capture_output=True, text=True, encoding='utf-8', errors='replace')
+                       capture_output=True, text=True, encoding='utf-8', errors='replace', creationflags=NOWIN)
     if r.returncode or r.stderr.strip() or not out_mp4.exists() or out_mp4.stat().st_size < 10000:
         raise RuntimeError('画面拼接失败：' + (r.stderr.strip()[:300] or '拼出来的文件太小'))
     shutil.rmtree(tmp, ignore_errors=True)
@@ -187,7 +229,7 @@ def make(juben_json, out_mp4, style='字卡', opts=None, audio=None, fps=30, wor
     render_video(juben_json, dur, silent, fps=fps, workers=workers, style=style, opts=opts)
     if audio:
         subprocess.run([ffmpeg(), '-y', '-loglevel', 'error', '-i', str(silent), '-i', str(audio), '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
-                        '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', str(out_mp4)], check=True)
+                        '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', str(out_mp4)], check=True, creationflags=NOWIN)
         silent.unlink()
     return out_mp4
 
@@ -202,11 +244,13 @@ if __name__ == '__main__':
     ap.add_argument('--声音', help='合进去的声音（出片夹里的 mix.wav）；不给就出无声')
     ap.add_argument('--段数', type=int, default=2, help='几个浏览器同时画')
     ap.add_argument('--抽帧', nargs='*', type=float, help='只抽这几秒的静帧看，不出整条')
+    ap.add_argument('--样子', default=None, help='专业版的片子用哪套样子画：象形 / 全息；不给就是字卡那套')
     a = ap.parse_args()
     meta = style_meta(a.画风); pal = meta.get('配色', {})
     if a.配色 and a.配色 not in pal.get('可选', []):
         ap.error(f'画风「{a.画风}」' + (f'的配色只有：{"、".join(pal["可选"])}' if pal.get('可选') else '不能换配色'))
     opts = {'theme': a.配色 or pal.get('默认', 'night')}
+    if a.样子: opts['样子'] = a.样子
     t0 = time.time()
     if a.抽帧 is not None:
         print(stills(a.剧本, a.抽帧, Path(a.剧本).parent / f'抽帧_{a.画风}', style=a.画风, opts=opts))

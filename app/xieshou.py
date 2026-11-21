@@ -13,17 +13,19 @@
 #          软件里没有模型的钥匙。中转地址写在软件根目录 设置.json 的「中转地址」，空着就不走 AI。
 #          AI 回的只是每句「上屏词 / 道具 / 动作」和全片主角词；时间、词组、数字动作、句型段落仍由规则那套算，AI 的选择盖在上面。
 # 11-07 考卷盲判：规则版真帮上忙 9%、错 38%；AI 版 41%、错 6%（正本 考卷/AI剧本测试/结果.md，那次是 Claude 小模型，换国内模型要重测）。
-import copy, hashlib, json, os, re, socket, threading, time, unicodedata, urllib.error, urllib.request, uuid
+import copy, hashlib, json, os, re, socket, ssl, threading, time, unicodedata, urllib.error, urllib.parse, urllib.request, uuid
 from pathlib import Path
+import donghua
+import huamian
 import juben
 import planner
 import shuzi
 from rules import pos_time
 
-VERSION = '1.3.2'
+VERSION = '1.4.0'   # 11-14 专业版施工：中转看到 1.4 起才给挑动画。只在施工夹里改了，没发版；发不发、叫几点几他定
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT = '规则'
-TIMEOUT = 95                       # 等中转最多几秒；必须比中转的「总时限秒」（默认 85）长，不然软件先放弃
+TIMEOUT = 170                      # 等中转最多几秒；必须比中转的「总时限秒」（默认 85）和配画面那一路的「时限秒」（默认 150，外加收尾几秒）都长，不然软件先放弃。11-16：95 改 170（配画面要叫几遍、改、查，真跑两分半的片约一分钟）
 
 
 def _rules(lines, dur, title=None, audio_end=None, **kw):
@@ -37,9 +39,50 @@ def settings():
     except (OSError, ValueError): return {}
 
 
+CERT = Path(__file__).resolve().parent / 'zhongzhuan.pem'   # 中转那张证书公开的那一半（11-15 路上加密）。包里带了它：一律走加密、只认这一张；没带：和以前一样
+
+
 def relay_url():
     u = (settings().get('中转地址') or '').strip().rstrip('/')
-    return u if not u or '://' in u else 'http://' + u              # 漏写 http:// 也认
+    u = u if not u or '://' in u else 'http://' + u                 # 漏写 http:// 也认
+    if u: u = u.split('://', 1)[0].lower() + '://' + u.split('://', 1)[1]   # 写成 HTTP://、Https:// 也认成小写（11-15 盲审：大写时带了证书也照样不加密地发）
+    if u.startswith('http://') and CERT.exists(): u = 'https://' + u[7:]   # 带了证书就走加密，地址写成 http 也改过来
+    return u
+
+
+_TLS = [None, None]   # 证书文件的改动时刻、照它做好的那把锁
+def _tls():
+    """只认软件包里带的那一张证书（服务器自己做的，不是买来的，所以不查网址名，只查是不是这一张）。没带证书回 None。"""
+    try: m = CERT.stat().st_mtime
+    except OSError: return None
+    if _TLS[0] != m:
+        c = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT); c.check_hostname = False; c.verify_mode = ssl.CERT_REQUIRED
+        c.load_verify_locations(cafile=str(CERT)); _TLS[:] = [m, c]
+    return _TLS[1]
+
+
+def _urlopen(req, timeout):
+    """连中转都走这里：加密的地址用上面那把锁（对不上那张证书就连不上，字幕和码都不会发出去）；不加密的照旧。"""
+    url = req if isinstance(req, str) else req.full_url
+    if not url.startswith('https://'):
+        if CERT.exists() and not _local(url): raise urllib.error.URLError('带了证书，不加密的地址不连')   # 带了证书的软件，外面的地址只走加密（本机地址是自测用的）
+        return urllib.request.urlopen(req, timeout=timeout)
+    ctx = _tls()
+    if ctx is None: raise urllib.error.URLError('软件包里没有中转的证书')
+    return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+
+
+def code_safe(url=None):
+    """次数码能不能往这个地址发：路上加密了才发（最怕码在路上被人看走）；本机地址是自测用的，不算上路。"""
+    url = relay_url() if url is None else url
+    return url.startswith('https://') or _local(url)
+
+
+def _local(url):
+    """是不是本机地址（127.0.0.1 / localhost）。地址里带 @、带反斜杠的一律不算（防有人把别处的地址写得像本机）。"""
+    try: p = urllib.parse.urlsplit(url); host = p.hostname or ''
+    except ValueError: return False
+    return '@' not in p.netloc and '\\' not in url and host in ('127.0.0.1', 'localhost', '::1')
 
 
 _NAME = [0.0, {}, None]   # 上次问到的时刻、中转 /health 报的东西、正在问的线程
@@ -52,7 +95,7 @@ def relay_info(wait=0.6):
     if time.time() - _NAME[0] >= 300 and not (_NAME[2] and _NAME[2].is_alive()):
         def ask():
             try:
-                with urllib.request.urlopen(url + '/health', timeout=3) as f: r = json.loads(f.read())
+                with _urlopen(url + '/health', timeout=3) as f: r = json.loads(f.read())
             except Exception: r = {}
             _NAME[0], _NAME[1] = time.time(), (r if isinstance(r, dict) else {})
         _NAME[2] = threading.Thread(target=ask, daemon=True); _NAME[2].start()
@@ -71,15 +114,15 @@ def relay_beian():
     return b if re.fullmatch(r'[^<>&"\']{4,60}', b) else ''
 
 
-SALES_LINE = '软件本身免费，想让大家都用得上。云端排画面要租服务器，所以这一项收 {价钱} 元，{期限}内最多 {条数} 条。'
-SALES_LINE_NO_N = '软件本身免费，想让大家都用得上。云端排画面要租服务器，所以这一项收 {价钱} 元。'   # 11-10：问不到中转的条数、期限时用，价钱是本地的照样写
-QR_LINE = '扫码付 {价钱} 元，付款时在备注里写上你的邮箱。24 小时内把码发到这个邮箱。'
+SALES_LINE = '软件本身免费。云端排画面这一项收费：{价钱} 元，{期限}内最多 {条数} 条。'
+SALES_LINE_NO_N = '软件本身免费。云端排画面这一项收费：{价钱} 元。'   # 11-10：问不到中转的条数、期限时用，价钱是本地的照样写
+QR_LINE = '扫码付 {价钱} 元，付款时在备注里写上你的邮箱。24 小时内把码发到这个邮箱；没收到先看垃圾邮件。'
 QR_MAX = 2 * 1024 * 1024
 
 
 def sale_local():
-    """开卖页的价钱、购买链接、收款码图片：读软件包里自带的 开卖.json，图放在 开卖\\ 夹里（11-09 第三轮：传输加密之前，这三样不从服务器取，
-    免得同一个无线网里懂行的人在半路换成自己的收款码、链接、价钱，买家的钱付给了别人）。没配、配错都当没有，页面写「还没开卖」。"""
+    """开卖页的价钱、购买链接：读软件包里自带的 开卖.json（11-09 第三轮：传输加密之前，这两样不从服务器取，免得半路被换）。没配、配错都当没有，页面写「还没开卖」。
+    收款码 11-17 起不在包里（他定过收款码不进任何包），向中转要，见 pro_qr。"""
     try: d = json.loads((ROOT / '开卖.json').read_text(encoding='utf-8'))
     except Exception: d = {}
     if not isinstance(d, dict): d = {}
@@ -87,20 +130,9 @@ def sale_local():
     if not re.fullmatch(r'\d{1,5}(\.\d{1,2})?', price) or float(price) <= 0: price = ''   # 0 元、不是数都当没设
     link = str(d.get('购买链接') or '').strip()
     if not re.fullmatch(r'https://[^\s"<>\\]{4,500}', link): link = ''               # 只认 https 开头
-    return dict(价钱=price, 链接=link, 收款码=_qr_local(d.get('收款码图片')))
-
-
-def _qr_local(name):
-    """开卖.json 里「收款码图片」写的文件名 → 开卖\\ 夹里那张图的路径。只认这个夹子里的一个 png / jpg 文件名，100 字节到 2 MB，文件头得真是图；
-    别处的路径、不在、读不了、不像图都当没有（页面就不出收款码）。"""
-    name = str(name or '').strip()
-    if not re.fullmatch(r'[^\\/:*?"<>|]{1,80}\.(?:png|jpg|jpeg)', name, re.I) or name.startswith('.'): return None
-    p = ROOT / '开卖' / name
-    try:
-        if not p.is_file() or not 100 <= p.stat().st_size <= QR_MAX: return None
-        with open(p, 'rb') as f: head = f.read(4)
-    except OSError: return None
-    return p if head.startswith(b'\x89PNG') or head.startswith(b'\xff\xd8\xff') else None
+    mail = str(d.get('联系邮箱') or '').strip()
+    if not re.fullmatch(r'[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}){1,4}', mail): mail = ''   # 11-20：开卖页「没收到码、要退款」写的邮箱，读本机，不从服务器取
+    return dict(价钱=price, 链接=link, 邮箱=mail)
 
 
 def pro_info():
@@ -114,10 +146,10 @@ def pro_info():
     term = s('专业版期限', 20) or ('一年' if days == 365 else f'{days} 天' if days else '')
     refund = [str(x).strip()[:200] for x in r.get('退款') if str(x).strip()][:6] if isinstance(r.get('退款'), list) else []
     return dict(条=n, 天=days, 试用=t if isinstance(t, int) and not isinstance(t, bool) and t >= 0 else None, model=relay_name(), 备案号=relay_beian(),
-                价钱=price, 链接=loc['链接'],
+                价钱=price, 链接=loc['链接'], 邮箱=loc['邮箱'],
                 那句话=SALES_LINE.format(价钱=price, 期限=term, 条数=n) if price and n and term else '', 期限=term, 退款=refund,
                 价钱句=SALES_LINE_NO_N.format(价钱=price) if price else '',   # 11-10 复审第 11 条：连不上中转时，价钱照样显示
-                收款码=loc['收款码'] is not None, 收款码说明=QR_LINE.format(价钱=price) if price else '', 连上=bool(r),
+                收款码=r.get('收款码') is True and code_safe(), 收款码说明=QR_LINE.format(价钱=price) if price else '', 连上=bool(r),
                 等=pos(r.get('等几秒')),                                 # 云端一条最多排几秒（中转配置「总时限秒」），开卖页明写（11-09 复审轻 1）
                 全站每天=r.get('全站每天') if isinstance(r.get('全站每天'), int) and not isinstance(r.get('全站每天'), bool) and r.get('全站每天') >= 0 else None)   # 0 = 不拦填了码的；None = 老中转没报   # 连上：问到了中转（开卖页分得清「连不上」和「价钱没设好」）
 
@@ -263,7 +295,7 @@ def _done(rec): return bool(rec) and rec in (_cache().get('排过') or [])
 def _mark_done(rec):
     """这条录音云端排成了：记下记号（只是一串乱码）。用完以后，排过的这几条重出还能用云端（中转不另扣）。"""
     if not rec: return
-    d = _cache(); d['排过'] = [x for x in d.get('排过') or [] if x != rec][-2999:] + [rec]; _save_cache(d)   # 记最近 3000 条（一个码最多 1000 条，够用）
+    d = _cache(); d['排过'] = [x for x in d.get('排过') or [] if x != rec][-2999:] + [rec]; _save_cache(d)   # 记最近 3000 条（一个码 300 条，够用）
 
 
 def stop_reason(rec=None):
@@ -305,9 +337,10 @@ def ask_trial(force=False):
             k = get_code()
             try:
                 b = {'设备号': device_id(), '版本': VERSION}
+                if k and not code_safe(url): raise RuntimeError('没加密，码不发')   # 这次不问；页面照旧用上次记的
                 if k: b['次数码'] = k
                 req = urllib.request.Request(url + '/shiyong', data=json.dumps(b).encode(), headers={'Content-Type': 'application/json; charset=utf-8'})
-                with urllib.request.urlopen(req, timeout=3) as f: _note(json.loads(f.read()), k)
+                with _urlopen(req, timeout=3) as f: _note(json.loads(f.read()), k)
             except Exception: pass                                 # 老中转没有这个地址、连不上：照旧用上次记的
             _LEFT[0] = time.time()
         _LEFT[1] = threading.Thread(target=ask, daemon=True); _LEFT[1].start()
@@ -315,19 +348,20 @@ def ask_trial(force=False):
     return trial_info()
 
 
+_QR = [0.0, None]   # 上次向中转要到收款码的时刻、那张图
 def pro_qr():
-    """开卖页的收款码图片：读软件包里 开卖\\ 夹的那张（开卖.json 写了文件名才读；11-09 第三轮起不向服务器要）。
-    回 (图, 类型)；没有、太大、不像图都回 None（页面就写「还没开卖」）。"""
-    try: d = json.loads((ROOT / '开卖.json').read_text(encoding='utf-8'))
-    except Exception: d = {}
-    p = _qr_local(d.get('收款码图片') if isinstance(d, dict) else None)
-    if not p: return None
-    try: b = p.read_bytes()
-    except OSError: return None
+    """开卖页的收款码图片：向中转要（11-17 总控定：收款码只放服务器上，他定过不进任何包；换码只换服务器上那张图，软件不用重发）。
+    只走加密的路（本机地址是自测用的）；要到的记 5 分钟。回 (图, 类型)；没开云端、连不上、没放、太大、不像图都回 None（页面就写「还没开卖」）。"""
+    url = relay_url()
+    if not url or not code_safe(url): return None
+    if _QR[1] is not None and time.time() - _QR[0] < 300: return _QR[1]
+    try:
+        with _urlopen(url + '/shoukuanma', timeout=5) as f: b = f.read(QR_MAX + 1)
+    except Exception: return None
     if not 100 <= len(b) <= QR_MAX: return None
-    if b.startswith(b'\x89PNG'): return b, 'image/png'
-    if b.startswith(b'\xff\xd8\xff'): return b, 'image/jpeg'
-    return None
+    r = (b, 'image/png') if b.startswith(b'\x89PNG') else (b, 'image/jpeg') if b.startswith(b'\xff\xd8\xff') else None
+    if r: _QR[:] = [time.time(), r]
+    return r
 
 
 def tell_pro():
@@ -336,7 +370,7 @@ def tell_pro():
     if not url: return False
     try:
         req = urllib.request.Request(url + '/liaojie', data=b'{}', headers={'Content-Type': 'application/json; charset=utf-8'})
-        with urllib.request.urlopen(req, timeout=5) as f: return bool(json.loads(f.read()).get('ok'))
+        with _urlopen(req, timeout=5) as f: return bool(json.loads(f.read()).get('ok'))
     except Exception: return False
 
 
@@ -348,13 +382,14 @@ def ask_relay(lines, rec=None):
     why = stop_reason(rec)
     if why: raise RuntimeError(why)
     k = get_code()
-    b = {'文字': [{'开始': round(l['t0'], 2), '句': ''.join(c[0] for c in l['cs'])} for l in lines], '设备号': device_id(), '版本': VERSION}
+    if k and not code_safe(url): raise RuntimeError('云端那头的路上还没加密，次数码先不发')   # 11-15：没加密不发码，这条改在本机排
+    b = {'文字': [{'开始': round(l['t0'], 2), '句': ''.join(c[0] for c in l['cs'])} for l in lines], '设备号': device_id(), '版本': VERSION + huamian.CAP}   # 中转看版本号：1.4 起的软件才给挑动画（专业版）；不能加新栏，线上的老中转见到不认得的栏会整条拒掉。11-15：版本号后面带一截记号（现在是「+画面3」，11-16），新中转看到就照整条片配画面的说明叫几遍、把关、查过意思再回，老中转照旧给老的十三种
     if k: b['次数码'] = k
     if rec: b['录音'] = rec
     body = json.dumps(b, ensure_ascii=False).encode()
     req = urllib.request.Request(url + '/juben', data=body, headers={'Content-Type': 'application/json; charset=utf-8'})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as f: r = json.loads(f.read())
+        with _urlopen(req, timeout=TIMEOUT) as f: r = json.loads(f.read())
     except urllib.error.HTTPError as e:
         try: r = json.loads(e.read())
         except Exception: r = {}
@@ -482,6 +517,7 @@ def _merge_line(j, l, s, icons, nxt=''):
     text = ''.join(c[0] for c in l['cs'])
     w = (s.get('上屏词') or '').strip(); ic = (s.get('道具') or '').strip()
     if s.get('退回') is True or not word_ok(w, text, nxt): return   # 中转拦下或那一截没回来（标了退回）、或这头再查也不合格：这句整句沿用本机规则的（11-09 复审中 11：原来留空，云端比本机还差）；11-09 第三轮：只盖住半个数的也退回
+    if len(text) >= 6 and len(w) >= 0.8 * len(text): return             # 11-14 傍晚：整句（或差不多整句）照抄回来当上屏词，等于没挑，这句沿用本机规则的词（整片盲审：一分多钟里行行整行重点色）
     if ic and (ic not in icons or ic in ('user', 'users')): ic = ''      # 人不画成图标（人物闸）
     if not w and not ic: return                                          # 11-09 第三轮：模型留空、只给人物图标：这句沿用本机规则的词，不空着
     if w:
@@ -502,12 +538,80 @@ def _icon_names():
     return set(json.loads(s[s.index('{'):s.rindex('}') + 1]))
 
 
+DH_K = dict(cut_ok=lambda w, t, nxt='': cut_ok(w, t, nxt), block_ok=lambda t, w: shuzi.whole_ok(t, w) and shuzi.qual_ok(t, w), num_blocks=lambda t: shuzi.blocks(t))
+
+
+def pro_items(ai, lines):
+    """云端挑的动画（专业版）在软件这头再查一遍，以这头为准：填的字必须是字幕原样的字，数连同单位照抄，认不准的整处不要。
+    返回 (合格的, 拦下的 [{项, 原因}])。云端没回这一栏就是两个空串。"""
+    its = ai.get('动画') if isinstance(ai.get('动画'), list) else []
+    if not its: return [], []
+    try: return donghua.check_all(its, [''.join(c[0] for c in l['cs']) for l in lines], DH_K)
+    except Exception: return [], []                              # 查的时候出任何岔子：一处都不画，照免费版的画法出
+
+
+PRO_RESTYLE = False   # 开关（2026-11-14 夜立，总控按默认值定的「做」；11-14 傍晚先关：整片盲审说免费版原样的清单、对话框、大数字更好读，换成纸和牌子不算变好。开关和代码留着，放哪边他还没定）：免费版自己认出来的大数字、排比清单、前后对比，换成纸、牌子的样子。关掉 = 这几处照免费版原样出
+
+
+def restyle_items(lines, dur, title=None, audio_end=None):
+    """免费版认出来的大数字卡、排比清单、前后对比 → 同一处的动画项（还要过 donghua 那道查，查不过的照免费版原样出）。字全是免费版自己从字幕里认的，不问云端。"""
+    j = planner.plan(copy.deepcopy(lines), dur, title=title, audio_end=audio_end)
+    T = [''.join(c[0] for c in l['cs']) for l in lines]
+    out = []
+    for sc in j['scenes']:
+        tp = sc.get('tpl') or {}
+        if sc['type'] == 'stat' and not sc.get('second') and sc.get('raw'):
+            out.append({'类型': '亮出大数', '从': sc['la'] + 1, '到': sc['lb'], '数': sc['raw'], '什么': sc.get('label') or ''})
+        elif sc['type'] == 'compare':
+            L, R = sc.get('L') or {}, sc.get('R') or {}
+            say = lambda sd: ((sd.get('parts') or [{}])[0].get('text') or '').split('\n')[0]
+            if L.get('label') and R.get('label'):
+                out.append({'类型': '并排对照', '从': sc['la'] + 1, '到': sc['lb'], '左': L['label'], '右': R['label'], '左说': say(L), '右说': say(R)})
+        elif sc['type'] == 'say' and tp.get('kind') == 'para':
+            its = tp.get('items') or []
+            if 2 <= len(its) <= 4 and all(len(g) == 1 for g in its):          # 一条占一句的才换；一条拖两句的牌子写不下
+                a_of = {q['line']: q.get('a', 0) for q in tp.get('parts') or []}
+                out.append({'类型': '几个要点', '从': tp['first'] + 1, '到': tp['end'] + 1, '点': [T[g[0]][a_of.get(g[0], 0):] for g in its]})
+    return out
+
+
 def _ai(lines, dur, title=None, audio_end=None, rec=None):
     ai = ask_relay(lines, rec)                                     # 先问中转，问不到就整条退回规则（不白算一遍规则）
     rows = ai.get('句') if isinstance(ai.get('句'), list) else []
     if len(lines) >= 3 and not any(isinstance(r, dict) and (r.get('上屏词') or r.get('道具')) for r in rows):
         raise RuntimeError('云端这次一个词都没排')            # 等于没排：退回本机规则，修改页说清楚
-    j = planner.plan(copy.deepcopy(lines), dur, title=title, audio_end=audio_end)
+    items = ai.get('动画'); runs = ai.get('动画几遍')
+    if isinstance(runs, list) and runs:                            # 11-16：中转叫了几遍、把过关、查过意思，几遍分开回来。这头合成一份：一处一处往里试，真排得进片子的才留
+        try: items, _ = huamian.merge_runs([[x for x in r if isinstance(x, dict)] for r in runs if isinstance(r, list)][:12], lines, dur, DH_K, title=title, audio_end=audio_end)
+        except Exception: items = []                               # 合的时候出任何岔子：一处都不画，照免费版的画法出
+    try: good, held = huamian.check_all(items, lines, DH_K)        # 11-15：整条片配画面（老的十三种 + 小画面）。本机这头再查一遍，以这头为准；查的时候出任何岔子，一处都不画
+    except Exception: good, held = [], []
+    bu_n = 0; bu_got = 0 if '补图标' in ai else None; bu_drop = 0      # 11-18：补图标回来几张、和主画面撞了丢掉几张，记进修改页记录（他那条进片子 0 张，原来分不清是没回来还是被丢了）
+    try:                                                           # 11-16：云端要是另外回了「补图标」（没配上画面的句子，各补一只图标一个词），这头查过、没和主画面撞上的才并进去。没回、回得不对，都当没有，和原来一样
+        raw = ai.get('补图标')
+        if raw:
+            got = huamian.bu_parse(raw if isinstance(raw, str) else json.dumps({'图标词': raw} if isinstance(raw, list) else raw, ensure_ascii=False)); bu_got = len(got)
+            bu, bu_held = huamian.bu_check(got, lines, DH_K)
+            n0 = len(good); good = huamian.with_bu(good, bu); bu_n = len(good) - n0; bu_drop = len(bu) - bu_n; held = held + bu_held
+    except Exception: bu_n = 0
+    jie = None
+    try:                                                           # 云端要是回了「接」（哪几句还在讲上一句那件事），小画面多留一两句；没回就不多留
+        raw = ai.get('接')
+        if raw: jie = huamian.jie_parse(raw if isinstance(raw, str) else json.dumps({'接': raw} if isinstance(raw, list) else raw, ensure_ascii=False), len(lines))
+    except Exception: jie = None
+    restyled = 0
+    if PRO_RESTYLE:
+        try:
+            more, _ = donghua.check_all(restyle_items(lines, dur, title=title, audio_end=audio_end), [''.join(c[0] for c in l['cs']) for l in lines], DH_K)
+            more = [m for m in more if not any(m['la'] < g['lb'] and g['la'] < m['lb'] for g in good)]   # 和云端挑的撞了，让云端的
+            good = sorted(good + more, key=lambda c: (c['la'], c['lb'])); restyled = len(more)
+        except Exception: pass                                     # 换样子出任何岔子：不换，照原样
+    huamian.JIE = jie or None
+    try: j = huamian.plan(lines, dur, good, title=title, audio_end=audio_end)   # 排卡那一步换成专业版的排法（说完就走、停不够往后借），排完换回去
+    finally: huamian.JIE = None
+    if good or held:                                               # 这条动画的账：云端挑了几处、画了几处、哪几处没画为什么（交付说明照实报）
+        drawn = sum(1 for s in j['scenes'] if s.get('type') == 'pro')
+        j['pro_note'] = dict(挑了=len(good) - restyled + len(held), 换样子=restyled, 补了=bu_n, 补回来=bu_got, 补撞掉=bu_drop, 画了=drawn, 没画=[dict(原因=h['原因']) for h in held] + [dict(原因=x['why'], 句=x['text']) for x in planner.PRO_LOG])
     j = merge(j, ai)
     if ai.get('_模型名'): j['writer_model'] = ai['_模型名']
     if ai.get('_没扣'): j['writer_note'] = NOFEE_NOTE                # 和开卖页、使用说明那句同一个意思

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)      # 11-20：软件改成不开黑框跑以后，调 ffmpeg 别每次闪一个黑框（Windows 才有这个开关，别处是 0）
 
 import numpy as np
 import cv2
@@ -277,7 +278,7 @@ def render_adapters(app,jobdir,focus):
              "-r",str(fps),"-i","-","-an","-vf","scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
              "-c:v","libx264","-preset","veryfast","-crf","17","-threads","6","-pix_fmt","yuv420p",
              "-color_primaries","bt709","-color_trc","bt709","-colorspace","bt709","-color_range","tv",str(out_mp4)]
-        with subprocess.Popen(cmd,stdin=subprocess.PIPE) as ff:
+        with subprocess.Popen(cmd,stdin=subprocess.PIPE,creationflags=NOWIN) as ff:
             try:
                 for i in range(n):
                     t=i/fps;amt=fan_amount(t)

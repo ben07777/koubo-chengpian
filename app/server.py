@@ -3,15 +3,33 @@ import json, os, re, shutil, sys, threading, time, webbrowser, socket, uuid
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
-if sys.stdout is None:  # 无窗口运行（pythonw）：提示和报错写进 runtime\运行记录.txt
-    sys.stdout = sys.stderr = open(Path(__file__).resolve().parent.parent / 'runtime' / '运行记录.txt', 'a', encoding='utf-8', buffering=1)
-
 APP = Path(__file__).resolve().parent
 ROOT = APP.parent
-(ROOT/'runtime').mkdir(exist_ok=True)
+RT = ROOT / 'runtime'; RT.mkdir(exist_ok=True)
+LOG = RT / '运行记录.txt'                     # 11-20：不开黑框以后，原来打在黑框里的话都写这里；出事时让他把这个文件发过来
+READY, FAILED, INUSE = RT / 'ready.flag', RT / 'start_error.txt', RT / 'in_use.json'      # 前两个给 剪一条.cmd 看（起来了 / 起不来；用英文名，黑框那头认中文文件名容易出岔子）；in_use.json 记着开在哪个端口
+if sys.stdout is None:  # 无窗口运行（pythonw）：提示和报错写进 runtime\运行记录.txt；太大了先挪成「上次」那份
+    try:
+        if LOG.exists() and LOG.stat().st_size > 2_000_000: os.replace(LOG, RT / '运行记录_上次.txt')
+    except OSError: pass
+    sys.stdout = sys.stderr = open(LOG, 'a', encoding='utf-8', buffering=1)
+
+
+def start_failed(why):
+    """起不来：中文原因写进 启动失败.txt（剪一条.cmd 会把它亮出来），英文的来龙去脉写进运行记录。"""
+    import traceback; traceback.print_exc()
+    print('启动失败：', why, flush=True)
+    try: FAILED.write_text(f'口播成片没能启动：{why}\n\n要求助的话，把这个文件发给我们：\n{LOG}\n', encoding='utf-8')
+    except OSError: pass
+
+
 OUT = ROOT / '出片'; OUT.mkdir(exist_ok=True)
 sys.path.insert(0, str(APP))
-import pipeline, juben  # noqa: E402
+try:
+    import pipeline, juben  # noqa: E402
+except Exception:
+    if __name__ == '__main__': start_failed('软件的文件不全。请把下载的压缩包重新解压一次，再到解出来的文件夹里双击「剪一条」。')
+    raise
 
 LOCK = threading.Lock()
 TYPES = {'.mp4': 'video/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.srt': 'text/plain; charset=utf-8', '.html': 'text/html; charset=utf-8',
@@ -49,7 +67,7 @@ def run_job(folder, **kw):
 
 
 def cn(e):
-    """网页上只给中文提示；英文报错只打到黑色窗口里。"""
+    """网页上只给中文提示；英文报错只写进 runtime\\运行记录.txt。"""
     m = str(e)
     if m and '一' <= m[0] <= '鿿': return m
     print('出错：', repr(e), flush=True)
@@ -119,7 +137,7 @@ class H(BaseHTTPRequestHandler):
             if u.path.startswith('/web/'): return self.file((APP / 'web' / Path(unquote(u.path[5:])).name))
             if u.path == '/icons.js': return self.file(APP / '画风' / '公共' / 'icons.js')   # 校字页画图标用（和画风同一份 Lucide）
             if u.path == '/api/ping':
-                global LAST_PING; LAST_PING = time.time(); return self.send(200, {})
+                global LAST_PING; LAST_PING = time.time(); return self.send(200, {'app': '口播成片', 'home': str(ROOT)})      # 11-20：再双击「剪一条」时，靠这两样认出开着的就是这个文件夹的软件
             if u.path == '/api/ver': return self.send(200, {'v': pipeline.xieshou.VERSION})   # 11-10：首页角落的版本号，读本机，不联网
             if u.path == '/api/styles':                                # 首页「画风」选择：有预览图、没标「首页列出: false」的才给选（11-12 起只剩字卡，首页那一行就不出）
                 out = []
@@ -140,11 +158,11 @@ class H(BaseHTTPRequestHandler):
                 beian = (x.relay_beian() if on else '') or str(x.settings().get('云端备案号') or '').strip()[:60]   # 11-09 第三轮 E：首页公示那句的备案号也从配置出
                 return self.send(200, dict(running=RUNNING, cloud=bool(x.relay_url()), model=(x.relay_name() if on else '') or x.settings().get('云端模型名') or '', beian=beian, ai=ai, agreed=agreed, trial=trial or None,
                                            code=x.show_code(x.get_code())))   # cloud：设了中转地址，首页才出「云端排画面」开关；code：填过的次数码（只在本机）
-            if u.path == '/api/pro':                                   # 「了解专业版」那页：价钱、链接、收款码读本地 开卖.json；条数、期限问中转（11-09 第三轮）
+            if u.path == '/api/pro':                                   # 「了解专业版」那页：价钱、链接读本地 开卖.json；条数、期限、收款码放没放问中转（11-09 第三轮；收款码 11-17）
                 x = pipeline.xieshou; d = x.pro_info() if x.relay_url() else {}; d['model'] = d.get('model') or x.settings().get('云端模型名') or ''
                 if not d.get('备案号'): d['备案号'] = str(x.settings().get('云端备案号') or '').strip()[:60]
                 return self.send(200, d)
-            if u.path == '/api/shoukuanma':                            # 开卖页的收款码：读软件包里 开卖\ 夹的图，不向服务器要（11-09 第三轮）
+            if u.path == '/api/shoukuanma':                            # 开卖页的收款码：向中转要，只走加密的路（11-17 总控定：收款码只放服务器上）
                 x = pipeline.xieshou; r = x.pro_qr() if x.relay_url() else None
                 if not r: return self.send(404, {'err': '没有收款码'})
                 return self.send(200, r[0], r[1])
@@ -187,7 +205,7 @@ class H(BaseHTTPRequestHandler):
                 src = d / ('原素材' + ext); self.save_body(src)
                 pipeline.Job(d).mark('排队', 1, '录音已存进本机文件夹：出片\\' + d.name)
                 run_job(d, src=src, theme=g('theme', '夜幕'), music=g('music', '1') == '1', keep_person=g('person', '0') == '1',
-                        trim=g('trim', '1') == '1', focus=g('focus') or None, style=unquote(g('style', '字卡')), use_ai=g('ai', '0') == '1' and agreed())
+                        trim=g('trim', '1') == '1', focus=g('focus') or None, style=unquote(g('style', '字卡')), use_ai=g('ai', '0') == '1' and agreed(), proof=True, look=unquote(g('look', '')) or None)   # proof：开了云端的先停在校字那一步（pipeline 里只对开了云端的生效）
                 return self.send(200, {'id': d.name})
             if u.path == '/api/redo':
                 if LOCK.locked(): return self.send(409, {'err': '还在生成中，完成后再修改'})
@@ -209,12 +227,13 @@ class H(BaseHTTPRequestHandler):
                         except OSError: shutil.copyfile(f, new/f.name)
                 if mine: mine = new / mine.name
                 pending=pipeline.Job(new)
+                pending.s.pop('wait_proof', None)   # 从「先改错字」那一步点过来的：新这条不再等改字（不拿掉，页面头一眼看到它又停回改字页，11-15 网页自测抓到）
                 pending.s.update(done=False, err='', log=[])
                 pending.mark('排队',1,'正在按校对后的字幕重新导出')
                 run_job(new, src=None, focus=b.get('focus') or None, theme=b.get('theme', '夜幕'), music=b.get('music', True) not in (False, 'off'),
                         edits=b.get('lines'), title=[x for x in b.get('title', []) if x.strip()] or None, my_music=mine,
                         keep_person=b.get('person'), cover_t=b.get('cover_t'), style=b.get('style') or prior.s.get('style', '字卡'), shows=shows,
-                        use_ai=b.get('ai', prior.s.get('use_ai', False)) not in (False, 0, '0') and agreed(), title_mark=b.get('title_mark'), cover_icon=b.get('cover_icon'))
+                        use_ai=b.get('ai', prior.s.get('use_ai', False)) not in (False, 0, '0') and agreed(), title_mark=b.get('title_mark'), cover_icon=b.get('cover_icon'), look=b.get('look') or prior.s.get('look'))
                 return self.send(200, {'id':new.name})
             if u.path == '/api/bgm':
                 d = safe_id(g('id')); ext = Path(unquote(g('name', 'm.mp3'))).suffix.lower()
@@ -249,6 +268,10 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, {'ok': True})
             if u.path == '/api/open':
                 d = safe_id(g('id')); os.startfile(str(d)); return self.send(200, {'ok': True})
+            if u.path == '/api/quit':                                  # 11-20：首页「关掉软件」。不开黑框以后，这是退出的路；正在出片又没说「真关」，先回去问一句
+                if RUNNING and g('force') != '1': return self.send(409, {'busy': True, 'err': '正在出片，现在关掉，这一条就白做了。'})
+                self.send(200, {'ok': True}); self.wfile.flush()
+                threading.Thread(target=quit_soon, daemon=True).start(); return
             self.send(404, {'err': '页面出错了，请刷新后再试'})
         except Exception as e:
             self.send(400, {'err': cn(e)})
@@ -288,13 +311,62 @@ def free_port(start=8765):
     raise RuntimeError('启动失败，请重启电脑后再试')
 
 
-if __name__ == '__main__':
+def quit_soon():
+    """首页点了「关掉软件」：回完话再退。出片的浏览器跟着它的管子断了自己关，ffmpeg 读不到画面也自己停。"""
+    time.sleep(0.3)
+    print(time.strftime('%H:%M:%S 点了「关掉软件」，退出'), flush=True)
+    try: INUSE.unlink(missing_ok=True)
+    except OSError: pass
+    os._exit(0)
+
+
+def other_running():
+    """这个文件夹的软件已经开着：回它的网址；没开、或者开着的不是这个文件夹的，回 None。只问本机，不走代理。"""
+    try: port = int(json.loads(INUSE.read_text(encoding='utf-8'))['port'])
+    except (OSError, ValueError, KeyError, TypeError): return None
+    import urllib.request
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(f'http://127.0.0.1:{port}/api/ping', timeout=2) as r: p = json.loads(r.read())
+    except Exception: return None
+    return f'http://127.0.0.1:{port}/' if p.get('app') == '口播成片' and p.get('home') == str(ROOT) else None
+
+
+def first_one():
+    """同一个文件夹的软件只许开一个（11-20）：Windows 自带的「互斥标记」，名字里带文件夹，别的文件夹解出来的那份照样能开。"""
+    if os.name != 'nt': return True
+    import ctypes, hashlib
+    k = ctypes.WinDLL('kernel32', use_last_error=True); k.CreateMutexW.restype = ctypes.c_void_p
+    global _MUTEX; _MUTEX = k.CreateMutexW(None, False, 'Local\\koubo-chengpian-' + hashlib.md5(str(ROOT).lower().encode('utf-8')).hexdigest()[:12])
+    return ctypes.get_last_error() != 183                 # 183：这个标记已经有人拿着
+
+
+def main():
+    if not first_one():                                   # 已经开着：只把首页再打开一次，不起第二个
+        for _ in range(40):
+            url = other_running()
+            if url:
+                print('已经开着，只把首页再打开一次：', url, flush=True)
+                if '--no-browser' not in sys.argv: webbrowser.open(url)
+                READY.write_text(url, encoding='utf-8'); return
+            time.sleep(0.5)
+        start_failed('软件好像已经开着，可是首页打不开。请重启电脑后再双击「剪一条」。'); sys.exit(1)
     from assets import verify
-    verify()
-    port = free_port()
+    try: verify()
+    except SystemExit as e: start_failed(f'少了模型文件，或者文件坏了。请把下载的压缩包重新解压一次。（{str(e.code).split("。")[0]}）'); sys.exit(1)      # 原话后半句「请先运行 安装依赖.cmd」是给源码包的，免安装包里没有这个文件，不带
+    try: port = free_port()
+    except RuntimeError: start_failed('电脑上软件要用的一串端口（8765 到 8814）都被别的程序占着。请重启电脑后再试。'); sys.exit(1)
     srv = ThreadingHTTPServer(('127.0.0.1', port), H)
     url = f'http://127.0.0.1:{port}/'
+    INUSE.write_text(json.dumps(dict(port=port, pid=os.getpid())), encoding='utf-8')
     print(f'口播成片已启动：{url}', flush=True)
-    print('关闭这个命令窗口即可退出。',flush=True)
-    if '--no-browser' not in sys.argv: webbrowser.open(url)
+    print('要退出，点首页右上角的「关掉软件」。', flush=True)
+    READY.write_text(url, encoding='utf-8')               # 先告诉 剪一条.cmd「起来了」，它的窗口好早点关；开浏览器要一两秒
+    if '--no-browser' not in sys.argv: threading.Thread(target=webbrowser.open, args=(url,), daemon=True).start()
     srv.serve_forever()
+
+
+if __name__ == '__main__':
+    print(time.strftime('\n==== %Y-%m-%d %H:%M:%S 启动'), flush=True)
+    try: main()
+    except SystemExit: raise
+    except Exception: start_failed('出现了没想到的错误。请重启电脑后再试；还不行，把记录文件发给我们。'); sys.exit(1)

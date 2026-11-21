@@ -1,0 +1,33 @@
+Lemo-Opuscar
+Copyright (c) 2026 Lemomo (LemoLab)
+https://github.com/lemomo-ai/lemo-opuscar
+
+口播成片的专业版从这个库里拿了下面这些代码文件。照它的 LICENSE 第 4 条，代码是 MIT 许可（它那份 LICENSE 的原文随软件放在 app/样子/LICENSE_lemo-opuscar.txt）：
+- styles/pictogram-motion/demo/engine.js → app/样子/象形/engine.js，文件原样没改（出片时在内存里把它写死的宽、高、格子换成竖屏的，不改文件）。
+- styles/pictogram-motion/demo/film.js 里的几段（rowDrift、stageDisc、chip、拼条进场、进度小格、字幕的做法、六种转场、整帧和运动模糊）→ 改成竖屏以后写在 app/样子/象形/页面.js 里，那几段在文件里标了「抄」。
+- styles/hologram-hud/demo/engine/holo.js、hud.js → app/样子/全息/engine/，文件原样没改。
+没有拿的：它的说明文档（各种 .md，那是另一种不许商用的许可）、示范片、图片、提示词、音乐、它那两条片的内容。
+跟着这两种风格来的四个字体各有各的许可，见本夹 InterTight_OFL.txt、DMMono_OFL.txt、Rajdhani_OFL.txt、ShareTechMono_OFL.txt。
+
+下面是 MIT 许可原文。正文取自该仓库的 LICENSES/MIT.txt（那份是没填版权行的范本），版权行照它 LICENSE 文件头上写的填。
+
+----------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 Lemomo (LemoLab)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.

@@ -2,6 +2,7 @@
 # 剪三样：句子之间过长的停顿（剪到 0.3 秒左右）；单独的「嗯」「呃」；说错重说的前一遍（只留最后一遍）。
 # 切点对齐到视频帧，音视频每段一样长，剪多少刀口型都不会越走越偏；接口处 12 毫秒淡入淡出，不爆音。
 import re, subprocess
+NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)      # 11-20：软件改成不开黑框跑以后，调 ffmpeg 别每次闪一个黑框（Windows 才有这个开关，别处是 0）
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -103,7 +104,7 @@ def summary(cuts, keep, total):
 
 
 def _fps(src, ffmpeg):
-    r = subprocess.run([ffmpeg, '-i', str(src)], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    r = subprocess.run([ffmpeg, '-i', str(src)], capture_output=True, text=True, encoding='utf-8', errors='ignore', creationflags=NOWIN)
     m = re.search(r'Video:.*?(\d+(?:\.\d+)?) fps', r.stderr or '')
     return float(m.group(1)) if m else None
 
@@ -132,7 +133,7 @@ def apply(src, keep, out, ffmpeg, video):
                 '-c:a', 'aac', '-b:a', '192k', str(out)]
     else:
         cmd += ['-map', '[a]', '-c:a', 'pcm_s16le', '-ar', '48000', str(out)]
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore', creationflags=NOWIN)
     script.unlink(missing_ok=True)
     if r.returncode: raise RuntimeError('ffmpeg: ' + (r.stderr or '').strip()[-600:])
     return out

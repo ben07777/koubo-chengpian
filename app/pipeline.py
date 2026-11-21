@@ -1,12 +1,13 @@
 # 一条录音 → 竖屏成片 + 封面 + 字幕文件。默认全在本机跑；开了「云端排画面」，把字幕文字和每句开始秒发到服务器（外加设备号、次数码这些记数用的），录音和视频不发。
 # 命令行用法：python app/pipeline.py 录音.mp3 [夜幕|白纸|方格本]
 import json, re, shutil, subprocess, sys, time, threading, traceback
+NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)      # 11-20：软件改成不开黑框跑以后，调 ffmpeg 别每次闪一个黑框（Windows 才有这个开关，别处是 0）
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent
 ROOT = APP.parent
 sys.path.insert(0, str(APP))
-import asr, cut, planner, render, bgm, person, juben, xieshou  # noqa: E402
+import asr, cut, planner, render, bgm, person, juben, xieshou, yangzi  # noqa: E402
 import native
 
 THEMES = {'夜幕': 'night', '白纸': 'paper2', '方格本': 'grid'}   # 11-12 夜他定发三套：夜、白纸（改色后，方案第六节）、方格本；薄荷、墨底宋体不发，选不到（老片子记着薄荷的，照夜出）
@@ -15,7 +16,7 @@ MIN_SEC, MAX_SEC = 3, 600  # 录音最短 3 秒，最长 10 分钟
 
 
 def ff(*args):
-    r = subprocess.run([render.ffmpeg(), '-y', '-loglevel', 'error', *map(str, args)], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    r = subprocess.run([render.ffmpeg(), '-y', '-loglevel', 'error', *map(str, args)], capture_output=True, text=True, encoding='utf-8', errors='ignore', creationflags=NOWIN)
     if r.returncode: raise RuntimeError('ffmpeg: ' + (r.stderr or '').strip()[-600:])
 
 
@@ -86,16 +87,21 @@ class Job:
         if msg: self.s['log'].append(f"{time.strftime('%H:%M:%S')} {msg}")
         self.save()
 
-    def run(self, src=None, theme='夜幕', music=True, edits=None, title=None, my_music=None, keep_person=None, cover_t=None, trim=True, focus=None, style='字卡', shows=None, use_ai=True, title_mark=None, cover_icon=None):
+    def run(self, src=None, theme='夜幕', music=True, edits=None, title=None, my_music=None, keep_person=None, cover_t=None, trim=True, focus=None, style='字卡', shows=None, use_ai=True, title_mark=None, cover_icon=None, proof=False, look=None):
         """src 给了就从头跑；不给就沿用上次的听写，只按改过的字幕 / 标题 / 风格重出。
         keep_person：视频里的人留不留（只对视频文件有用）；重出时不给就照上次。
         trim：先剪掉过长的停顿、「嗯」「呃」和说错重说的前一遍，再往下做（只在从头跑时有用）。
         style：画风名（app/画风/ 下的文件夹）；shows：校字页的修改，一轮一份按先后存（每轮每句一项；见 juben.merge_show_edits、apply_show_edits）。
-        use_ai：用户没关「云端排画面」；设了中转地址时走 AI 写手，出问题自动退回规则写手（见 xieshou.py）。"""
+        use_ai：用户没关「云端排画面」；设了中转地址时走 AI 写手，出问题自动退回规则写手（见 xieshou.py）。
+        look：专业版的片子用哪套样子画（yangzi.LOOKS，2026-11-16）；不给就照上次，上次也没有就用默认那套。只换样子重出：字幕没改，画面沿用上一次排的，不找云端。
+        给 '字卡' 就是字卡那套老的专业版画法（自测对照用，网页上不列）。免费版的片子不看它。"""
         t_start = time.time(); d = self.dir
         try:
             if keep_person is None: keep_person = self.s.get('person', False)
+            if look not in yangzi.LOOKS + ('字卡',): look = self.s.get('look') if self.s.get('look') in yangzi.LOOKS + ('字卡',) else yangzi.DEFAULT
+            self.s['look'] = look
             if style not in render.listed_styles(): style = '字卡'   # 和首页一样：首页列着的画风才给用（11-12 起只剩字卡；跳字、夜路、水面他否了，旧片子重出也走字卡）
+            self.s.pop('wait_proof', None)
             self.s.update(done=False, err='', theme=theme, music=bool(music), my_music=bool(my_music), style=style); self.save()
             if src:
                 self.mark('听写', 2, '开始识别字幕（在本机进行，文件不上传）'); voice = None
@@ -126,6 +132,11 @@ class Job:
                 self.mark('剪气口' if trim else '听写', 8, f'字幕识别完成，共 {len(lines)} 句')
                 if keep_person and not person.has_video(src, render.ffmpeg()):
                     keep_person = False; self.mark('听写', None, '这个文件只有声音没有画面，将生成纯动效版')
+                if proof and use_ai and not keep_person and xieshou.relay_url():   # 有人出镜的不叫云端（11-18），也就不用停下等改字   # 专业版（11-15 总控令）：云端配画面排在改完错字之后。字幕认出来先停在这里，用户看一眼错字、点「开始出片」（走重出那条路）才叫云端；没开云端的不停
+                    self.s.update(lines=[''.join(c[0] for c in l['cs']) for l in lines], title=[], person=bool(keep_person), use_ai=True, focus=focus, shows=None, scenes=[], wait_proof=True)
+                    self.s['trial'] = xieshou.trial_info() or None
+                    self.mark('听写', 9, '字幕认出来了。先看一眼有没有错字，改好点「开始出片」')
+                    return
             lines = json.loads((d / 'lines_asr.json').read_text(encoding='utf-8'))
             if edits:
                 lines = planner.apply_edits(lines, edits)
@@ -145,23 +156,24 @@ class Job:
                 self.s['cover_t'] = pmeta['cover_t']
             self.mark('定画面', 15)
             self.s['use_ai'] = bool(use_ai)
+            ai = bool(use_ai) and not pmeta   # 11-18 总控定：有人出镜的录像只用字幕和时间、重点词在本机挑，云端排的用不上，所以不叫云端、不扣条数（试用也不扣）。开关照用户点的记着
             rec = xieshou.recording_id(next(iter(sorted(d.glob('原素材.*'))), None))   # 这条录音的记号：按录音文件算，改字、换画风、重新导入都一样，云端按它记条数
             raw = d / '剧本_写手原稿.json'          # 写手原样交的剧本（还没套用户的修改）。重出时字幕没改、写手没换就接着用它，
             jb = None                               # AI 不会重新排出一套不同的词，用户第一轮改的才对得上（第 5 步盲审）
             if raw.exists():
                 try:
                     old = juben.load(raw)
-                    retry = use_ai and xieshou.relay_url() and (old.get('writer_retry') or (old.get('writer_stop') and xieshou.stop_reason(rec) is None))   # 上次没连上云端、这次还开着：再试一次；上次用完或码不对、这次填了新码：也再试（不知道的不白问）
-                    if [l['text'] for l in old['lines']] == [''.join(c[0] for c in l['cs']) for l in lines] and old.get('use_ai') == bool(use_ai) and not retry:
+                    retry = ai and xieshou.relay_url() and (old.get('writer_retry') or (old.get('writer_stop') and xieshou.stop_reason(rec) is None))   # 上次没连上云端、这次还开着：再试一次；上次用完或码不对、这次填了新码：也再试（不知道的不白问）
+                    if [l['text'] for l in old['lines']] == [''.join(c[0] for c in l['cs']) for l in lines] and old.get('use_ai') == ai and not retry:
                         jb = old; self.mark('定画面', None, '字幕没改，画面沿用上一次排的')
-                        if not use_ai: jb.pop('writer_note', None)          # 云端开着、上次没用上：原因留着，修改页接着说清楚
+                        if not ai: jb.pop('writer_note', None)          # 云端开着、上次没用上：原因留着，修改页接着说清楚
                         if title: planner.retitle(jb, title)                # 封面大字改了照样换
                 except Exception:
                     jb = None
             if jb is None:
-                if use_ai and xieshou.relay_url(): self.mark('定画面', None, '把字幕文字和每句开始的秒数发到云端排画面，另外带上记数用的设备号、次数码、录音记号和软件版本号（录音和视频不发）')   # 11-09 第三轮 F：进度那行写全
-                jb = xieshou.write(lines, dur, title=title, audio_end=duration(d / 'vo.wav'), use_ai=use_ai, rec=rec)
-                jb['use_ai'] = bool(use_ai)
+                if ai and xieshou.relay_url(): self.mark('定画面', None, '把字幕文字和每句开始的秒数发到云端排画面，另外带上记数用的设备号、次数码、录音记号和软件版本号（录音和视频不发）')   # 11-09 第三轮 F：进度那行写全
+                jb = xieshou.write(lines, dur, title=title, audio_end=duration(d / 'vo.wav'), use_ai=ai, rec=rec)
+                jb['use_ai'] = ai
                 juben.save(jb, raw)
                 if jb.get('writer_note'): self.mark('定画面', None, jb['writer_note'])   # 「懂」层的唯一输出：剧本（dur 补了 0.8 秒空白，判断话说没说完要用录音真长度）
             self.s['trial'] = xieshou.trial_info() or None if xieshou.relay_url() else None   # 免费试用还剩几条（中转最近一次报的），修改页开关旁写它
@@ -183,6 +195,7 @@ class Job:
             self.s['cover_icon_on'] = bool(cover_icon); self.s.pop('cover_icon_first_off', None)
             if not cover_icon and cv: cv['noicon'] = True
             juben.save(jb, d / '剧本.json')
+            if pmeta and use_ai and xieshou.relay_url(): jb['writer_note'] = '有人出镜的录像保留原画面，不用云端，不扣条数。'   # 11-18：修改页「这条是谁排的」下面说清楚
             self.s['writer'] = jb.get('writer', '规则'); self.s['writer_note'] = jb.get('writer_note', ''); self.s['writer_model'] = jb.get('writer_model', '')
             p = juben.to_plan(jb, THEMES.get(theme, 'night'))          # 下面记进度用；画风只读 剧本.json
             if pmeta:                                                  # 对着镜头录的视频走相纸那条路（native.py），它还吃旧格式
@@ -214,6 +227,10 @@ class Job:
                 if k % 15 == 0: self.s['pct'] = 22 + int(66 * a / max(b, 1)); self.save()
             opts = dict(theme=THEMES.get(theme, 'night'))              # 画风参数：字卡的配色
             sopts = opts if style == '字卡' else dict(theme=(render.style_meta(style).get('配色') or {}).get('默认', 'night'))
+            self.s['look_used'] = None
+            if style == '字卡' and not pmeta and jb.get('writer') == 'AI' and look in yangzi.LOOKS:      # 专业版的片子：视频画面照点的那套样子画；封面照旧字卡
+                sopts = dict(opts, 样子=look); self.s['look_used'] = look
+                self.mark('画画面', None, f'画面样子：{yangzi.NAMES[look]}')
             drawn = d / '画面用词.json'; drawn.unlink(missing_ok=True)   # 画风登记的「画出来的字」，修改页照它列
             video_renderer = lambda src, dur_, out, progress=None: render.render_video(src, dur_, out, progress=progress, style=style, opts=sopts, drawn=drawn)
             covers = lambda src, times, out_dir, cover=None: render.stills(src, times, out_dir, cover=cover, style='字卡', opts=opts)   # 封面一律用字卡（别的画风声明了不出封面）
@@ -246,7 +263,7 @@ class Job:
 
 
 NAMES = dict(hook='开场大字', say='大字跳出', question='问号', cta='收尾印章', myth='误区卡', compare='前后对比', flip='划掉改写', pair='圆章并列',
-             range='区间条', stat='数字滚动', list='清单卡', cause='因果箭头', year='年份时间线')
+             range='区间条', stat='数字滚动', list='清单卡', cause='因果箭头', year='年份时间线', pro='按意思配的动画')
 
 
 if __name__ == '__main__':

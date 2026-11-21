@@ -78,6 +78,10 @@ function zkScene(s) {
     const nm = TPL_VNAME[s.tpl.var] || TPL_NAME[s.tpl.kind], lab = nm && (['ban', 'example', 'attn', 'auto'].includes(s.tpl.kind) ? `${nm}：${s.tpl.word}` : nm);   // 1.3.2：框住、打勾的签也带上那个词
     if (!lab || !said(s.tpl.line, lab, '模板')) s = Object.assign({}, s, { tpl: null });
   }
+  if (s.type === 'pro') {   // 1.4 专业版动画：整处登记成一颗签；修改页点 × 去掉，这几句照普通句卡出
+    const m = s.num || (s.rows && s.rows[0].num) || (s.pts && s.pts[0]) || (s.L && s.L.name) || s.cw || (s.steps && s.steps[0]) || s.A || (s.evs && s.evs[0].when);
+    if (!m || !PRO[s.kind] || !said(m.li, s.kind + '：' + m.text, '动画')) s = Object.assign({}, s, { type: 'say', icon: null });
+  }
   return s;
 }
 const TPL_NAME = { ban: '圈加斜杠', example: '拎出来', time: '圆盘钟点', grow: '拉开', drop: '往下', attn: '框住', auto: '打勾', para: '排比', quote: '对话框' };   // 1.3.2 十种（钱不单做），和 planner 的 TPL_NAME 一样
@@ -1203,6 +1207,319 @@ const BUILD = {
     };
   },
 };
+
+// ---------- 专业版动画（1.4，2026-11-14 立）：云端按意思挑的十一种（11-14 夜加了圈重点、一步接一步、因果、前后变化、时间先后）。planner 的 pro_card 给东西，这里只管画 ----------
+// 字都是字幕原样的字；一样东西说到才出来，从开口到落定用 PRO_TAIL 秒（和 planner 的 PRO_TAIL 一个数，两边一起改）。
+// 舞台 1080×800，东西都收在横向 100 到 870 之间（右边是抖音按钮列）；底下字幕照出。
+// 画法参考了 huashu-art-motion 财经图表那一节的规矩（MIT）：柱从零长、数说到时落定、落定后停住、一个颜色讲主角。
+const PRO_TAIL = { '亮出大数': 0.3, '占多少': 0.45, '比多少': 0.55, '几组对比': 0.55, '并排对照': 0.4, '几个要点': 0.3, '圈重点': 0.5, '一步接一步': 0.35, '因果': 0.45, '前后变化': 0.45, '时间先后': 0.35, '转折': 0.45, '一好一坏': 0.4 };
+const PRO_CX = 485, PRO_PAPER = '#EFE6D2', PRO_INK = '#221E17', PRO_GREY = 'rgba(60,50,30,.17)', PRO_TAN = '#E2D0A2', PRO_TAN2 = '#B79B66';
+const proAt = (sc, T) => Math.max(T, sc.t0 + 0.35);   // 说到的时刻；卡刚进来就说到的，等卡露满（planner 的 PRO_IN）
+function proPaper(parent, x, y, w, h) {                // 一张纸
+  return abs(el('div', null, null, parent, { height: h + 'px', background: PRO_PAPER, color: PRO_INK, borderRadius: '12px', border: '1px solid rgba(0,0,0,.16)',
+    boxShadow: '0 28px 60px rgba(0,0,0,.42), inset 0 2px 0 rgba(255,255,255,.55)', transformOrigin: '50% 50%' }), x, y, w);
+}
+const proGrey = (parent, x, y, w) => abs(el('div', null, null, parent, { height: '14px', borderRadius: '7px', background: PRO_GREY }), x, y, w);
+const proRule = (sc, y = 86) => abs(el('div', null, null, sc.el, { height: '6px', borderRadius: '3px', background: 'var(--acc)', transformOrigin: '0 50%' }), 100, y, 770);   // 顶上一根线
+function proNum(parent, N, maxW, cap, style) {         // 一个数：数字大，前面的限定词、后面的单位小；放不下 maxW 就整体缩。字照抄字幕
+  const dig = /\d/.test(N.n), tot = uW(N.n) * (dig ? 1 : 1.04) + 0.46 * uW(N.u || '') + 0.36 * uW(N.pre || '') + 0.1;
+  const nsz = Math.min(cap, Math.floor(maxW / tot));
+  const row = el('div', null, null, parent, Object.assign({ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: Math.round(nsz * 0.04) + 'px', whiteSpace: 'nowrap', lineHeight: 1 }, style || {}));
+  if (N.pre) el('div', 'big', N.pre, row, { fontSize: Math.round(nsz * 0.36) + 'px' });
+  el('div', dig ? 'num' : 'big', N.n, row, { fontSize: nsz + 'px', letterSpacing: dig ? '-2px' : '0' });
+  if (N.u) el('div', 'big', N.u, row, { fontSize: Math.round(nsz * 0.46) + 'px' });
+  return { row, nsz };
+}
+function proStack(parent, cx, baseY, w, n, th) {       // 一摞片：底在 baseY，n 片，每片厚 th。show(k) 露出下面 k 片，gold(k) 下面 k 片换成重点色
+  const he = Math.round(w * 0.26), ds = [];
+  const sh = abs(el('div', null, null, parent, { height: Math.round(he * 0.9) + 'px', borderRadius: '50%', background: 'rgba(0,0,0,.4)', filter: 'blur(14px)', opacity: 0 }), cx - w * 0.56, baseY - he * 0.5, w * 1.12);
+  const side = (i, g) => g ? (i % 2 ? 'color-mix(in srgb, var(--acc) 80%, #000)' : 'color-mix(in srgb, var(--acc) 66%, #000)') : (i % 2 ? PRO_TAN2 : '#A1854F');
+  for (let i = 0; i < n; i++) ds.push(abs(el('div', null, null, parent, { height: he + 'px', borderRadius: '50%', background: PRO_TAN, border: '1px solid rgba(70,50,20,.38)', boxShadow: `0 ${th}px 0 ${side(i, false)}`, opacity: 0 }), cx - w / 2 + (th >= 6 ? Math.round((hash(i, cx) - 0.5) * 6) : 0), baseY - he - i * th, w));
+  return { he, topY: k => baseY - he - Math.max(0, k - 1) * th,
+    show(k) { ds.forEach((d, i) => { const a = clamp(k - i); d.style.opacity = a.toFixed(3); d.style.transform = a > 0 && a < 1 ? `translateY(${((a - 1) * 26).toFixed(1)}px)` : 'none'; }); sh.style.opacity = clamp(k / 3).toFixed(3); },
+    gold(k) { ds.forEach((d, i) => { const g = i < k; if (d._g === g) return; d._g = g; d.style.background = g ? 'var(--acc)' : PRO_TAN; d.style.boxShadow = `0 ${th}px 0 ${side(i, g)}`; }); } };
+}
+function proHand(parent, x, y, w, h, sw, seed) {      // 记号笔手画的一圈：转不到两圈，头尾不重合。返回 k => 画到几成
+  const s = svgBox(parent, x, y, w, h), N = 120, q = [];
+  for (let i = 0; i <= N; i++) {
+    const k = i / N, a = -2.6 + k * Math.PI * 3.7, wob = noise1(k * 5, seed) * 0.03;
+    q.push((w / 2 + Math.cos(a) * w / 2 * (0.93 + 0.09 * k + wob)).toFixed(1) + ' ' + (h / 2 + Math.sin(a) * h / 2 * (0.87 + 0.15 * k - wob)).toFixed(1));
+  }
+  const p = svgEl('path', { d: 'M' + q.join('L'), fill: 'none', stroke: 'var(--acc)', 'stroke-width': sw, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, s);
+  return k => dash(p, k);
+}
+function proArrow(parent, pts, sw) {                   // 一根箭头，沿 pts 走：杆先长，头后出。返回 k => 画到几成
+  const s = svgBox(parent, 0, 0, 10, 10), [x2, y2] = pts[pts.length - 1], [x1, y1] = pts[pts.length - 2], a = Math.atan2(y2 - y1, x2 - x1), L = sw * 2.6;
+  const at = { fill: 'none', stroke: 'var(--acc)', 'stroke-width': sw, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+  const shaft = svgEl('path', Object.assign({ d: 'M' + pts.map(p => p.join(' ')).join('L') }, at), s);
+  const hp = d => (x2 - L * Math.cos(a + d)).toFixed(1) + ' ' + (y2 - L * Math.sin(a + d)).toFixed(1);
+  const head = svgEl('path', Object.assign({ d: `M${hp(0.55)}L${x2} ${y2}L${hp(-0.55)}` }, at), s);
+  return k => { dash(shaft, k / 0.7); dash(head, (k - 0.6) / 0.4); };
+}
+function proText(parent, s, w, h, cap, color) {      // 一段字居中放进 w×h：短的一行，长的折成两三行，放不下就缩。字照抄字幕
+  let L = 1; const n = uW(s); while (L < 3 && w / Math.ceil(n / L) < 64) L++;                       // 一行放下来字不到 64 就折行
+  const fs = Math.max(40, Math.min(cap, Math.floor(w / Math.ceil(n / L)), Math.floor(h / (L * 1.16))));
+  const box = el('div', null, null, parent, { position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' });
+  el('div', 'big', s, box, Object.assign({ width: w + 'px', textAlign: 'center', fontSize: fs + 'px', lineHeight: 1.16, color: color || 'inherit' }, L > 1 ? { wordBreak: 'break-all', textWrap: 'balance' } : { whiteSpace: 'nowrap' }));
+  return box;
+}
+const PRO = {
+  '亮出大数'(sc) {   // 一张纸落下来，说到那个数，数砸在纸上（11-14 整片盲审：底下三道灰线像半成品，拿掉，纸收矮）
+    const N = sc.num, W = 740, H = sc.what ? 470 : 400, T = proAt(sc, N.t), ny = sc.what ? 126 : 56;
+    const rule = proRule(sc), pp = proPaper(sc.el, PRO_CX - W / 2, sc.what ? 170 : 200, W, H);
+    if (sc.what) {
+      abs(el('div', null, null, pp, { width: '22px', height: '22px', background: 'var(--acc)', borderRadius: '4px' }), 54, 58);
+      abs(el('div', 'big', sc.what.text, pp, { fontSize: Math.min(60, Math.floor(560 / Math.max(4, uW(sc.what.text)))) + 'px', whiteSpace: 'nowrap', lineHeight: 1.1, color: PRO_INK }), 94, 36);
+    }
+    const nbox = abs(el('div', null, null, pp, { height: '270px', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: '50% 60%' }), 0, ny, W);
+    proNum(nbox, N, 640, 260);
+    const ul = abs(el('div', null, null, pp, { height: '10px', borderRadius: '5px', background: 'var(--acc)', transformOrigin: '0 50%' }), 54, ny + 282, W - 108);
+    SHAKES.push([T + 0.12, 7]);
+    return t => {
+      const k0 = P(t, sc.t0 + 0.05, sc.t0 + 0.5, E.outB); set(pp, { y: (1 - k0) * -70, r: -6 + 4.5 * k0 });
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      const kn = P(t, T, T + PRO_TAIL['亮出大数'], E.outC); set(nbox, { o: P(t, T - 0.04, T + 0.08), s: 1.55 - 0.55 * kn });
+      ul.style.transform = `scaleX(${P(t, T + 0.04, T + PRO_TAIL['亮出大数'], E.outC).toFixed(4)})`;
+    };
+  },
+  '占多少'(sc) {     // 一摞一百片，占了几成就有几片换成重点色
+    const N = sc.num, T = proAt(sc, N.t), pct = clampN(Math.round(N.val), 1, 100), TH = 4.4, BASE = 730;
+    const rule = proRule(sc), st = proStack(sc.el, 290, BASE, 300, 100, TH);
+    const yG = st.topY(pct) + st.he / 2, cy = clampN(yG, 270, 520);
+    const tick = abs(el('div', null, null, sc.el, { height: '5px', borderRadius: '3px', background: 'var(--acc)', transformOrigin: '0 50%' }), 448, yG - 2, 60);
+    const box = abs(el('div', null, null, sc.el, { textAlign: 'center', transformOrigin: '50% 50%' }), 520, 0, 350);
+    const num = proNum(box, N, 340, 200, { color: 'var(--acc)' });
+    if (sc.what) el('div', 'big', sc.what.text, box, { fontSize: Math.min(76, Math.floor(340 / Math.max(3, uW(sc.what.text)))) + 'px', whiteSpace: 'nowrap', marginTop: '18px', color: 'var(--ink)', lineHeight: 1.1 });
+    sc.measure.push(() => { box.style.top = Math.round(cy - box.offsetHeight / 2) + 'px'; });
+    const g1 = Math.max(sc.t0 + 0.3, Math.min(T - 0.05, sc.t0 + 0.8));   // 整摞先长出来，赶在说到那个数之前
+    return t => {
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      st.show(100 * P(t, sc.t0 + 0.05, g1, E.outC));
+      st.gold(Math.round(pct * P(t, T - 0.1, T + 0.35, E.outC)));
+      const kn = P(t, T, T + 0.3, E.outC); set(box, { o: P(t, T - 0.04, T + 0.1), s: 1.3 - 0.3 * kn });
+      tick.style.transform = `scaleX(${P(t, T + 0.15, T + PRO_TAIL['占多少'], E.outC).toFixed(4)})`; tick.style.opacity = t >= T ? 1 : 0;
+    };
+  },
+  _stacks(sc) {      // 比多少、几组对比：几摞并排，高矮照数的大小，从零长；说到哪个哪摞长
+    const R = sc.rows, n = R.length, sp = n === 2 ? 380 : 770 / n, w = Math.min(250, sp - 50), M = 50, TH = 8, BASE = 690;
+    const mx = Math.max(...R.map(r => r.num.val)), tail = PRO_TAIL[sc.kind];
+    const G = R.map((r, i) => {
+      const cx = PRO_CX + (i - (n - 1) / 2) * sp, cnt = Math.max(1, Math.round(r.num.val / mx * M)), T = proAt(sc, r.num.t);
+      const st = proStack(sc.el, cx, BASE, w, cnt, TH);
+      const nb = abs(el('div', null, null, sc.el, { textAlign: 'center' }), cx - sp / 2 + 8, 0, sp - 16);
+      const num = proNum(nb, r.num, sp - 28, n === 2 ? 118 : 96, { color: r.num.val === mx ? 'var(--acc)' : 'var(--ink)' });
+      const nm = r.name ? abs(el('div', 'big', r.name.text, sc.el, { textAlign: 'center', fontSize: Math.min(72, Math.floor((sp - 24) / Math.max(2, uW(r.name.text)))) + 'px', whiteSpace: 'nowrap', color: 'var(--ink)', lineHeight: 1.1 }), cx - sp / 2 + 8, BASE + 30, sp - 16) : null;
+      return { st, cnt, T, nb, num, nm, tn: r.name ? Math.min(proAt(sc, r.name.t), T) : T };
+    });
+    const rule = proRule(sc, 40);
+    return t => {
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      G.forEach(g => {
+        const k = P(t, g.T - 0.12, g.T + tail - 0.12, E.outQn); g.st.show(g.cnt * k);
+        g.nb.style.top = (g.st.topY(Math.max(1, g.cnt * k)) - g.num.nsz - 22) + 'px'; set(g.nb, { o: P(t, g.T, g.T + 0.18), s: 0.86 + 0.14 * P(t, g.T, g.T + tail, E.outB) });
+        if (g.nm) set(g.nm, { o: P(t, g.tn - 0.05, g.tn + 0.2), y: (1 - P(t, g.tn - 0.05, g.tn + 0.3, E.outC)) * 20 });
+      });
+    };
+  },
+  '比多少'(sc) { return PRO._stacks(sc); },
+  '几组对比'(sc) { return PRO._stacks(sc); },
+  '并排对照'(sc) {   // 两张纸并排：说到哪边，哪边那张滑进来
+    const W = 365, H = 480, Y = 150, rule = proRule(sc);
+    const side = (S, x, rot, from) => {
+      const pp = proPaper(sc.el, x, Y, W, H), T = S.name.t <= Math.min(sc.L.name.t, sc.R.name.t) ? sc.t0 + 0.35 : proAt(sc, S.name.t);   // 先说的那一边跟着卡一起进来
+      el('div', 'big', S.name.text, pp, { position: 'absolute', left: '32px', top: '36px', width: (W - 64) + 'px', fontSize: Math.min(92, Math.floor((W - 64) / Math.max(2, uW(S.name.text)))) + 'px', whiteSpace: 'nowrap', lineHeight: 1.1 });
+      abs(el('div', null, null, pp, { height: '8px', borderRadius: '4px', background: 'var(--acc)' }), 32, 158, 96);
+      let say = null, ts = T;
+      if (S.say) { const n = uW(S.say.text), fs = n <= 8 ? 72 : 58;
+        say = abs(el('div', 'big', S.say.text, pp, { fontSize: fs + 'px', lineHeight: 1.22, wordBreak: 'break-all', textWrap: 'balance' }), 32, 200, W - 64); ts = Math.max(proAt(sc, S.say.t), T + 0.1); proGrey(pp, 32, 420, W - 64); proGrey(pp, 32, 446, W - 150); }
+      else [[214, W - 64], [252, W - 110], [290, W - 64], [328, W - 170]].forEach(([y, w]) => proGrey(pp, 32, y, w));
+      return { pp, T, say, ts, rot, from };
+    };
+    const A = [side(sc.L, 100, -1.6, -1), side(sc.R, 505, 1.6, 1)], tail = PRO_TAIL['并排对照'];
+    return t => {
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      A.forEach(a => {
+        const k = P(t, a.T - 0.05, a.T + tail, E.outB); set(a.pp, { o: P(t, a.T - 0.05, a.T + 0.12), x: (1 - k) * 150 * a.from, r: a.rot * (2 - k) });
+        if (a.say) set(a.say, { o: P(t, a.ts - 0.03, a.ts + 0.2), y: (1 - P(t, a.ts - 0.03, a.ts + tail, E.outC)) * 18 });
+      });
+    };
+  },
+  '几个要点'(sc) {   // 一根线上挂几块牌子，说到哪条哪块落下来
+    if (sc.bubble || sc.pts.some(p => uW(p.text) > 4)) return PRO._slips(sc, sc.pts, false);   // 竖牌子只留给四个字以内的短词（11-14 整片盲审：六个字竖着念比横排慢）；长的、别人说的话，用横纸条
+    const Pn = sc.pts, n = Pn.length, sp = n === 2 ? 300 : 770 / n, pw = n <= 3 ? 220 : 172, LY = 100, tail = PRO_TAIL['几个要点'];   // 两块牌子靠拢挂在中间
+    const RUN = /[0-9A-Za-z.%]{1,5}/g, units = s => s.replace(RUN, 'x').length;   // 竖排：一串数字、字母横着并成一格
+    const vert = s => s.replace(RUN, m => m.length > 1 ? `<span style="text-combine-upright:all;-webkit-text-combine:horizontal">${m}</span>` : m);
+    const fs = clampN(Math.floor(510 / Math.max(...Pn.map(p => units(p.text)))), 60, 120);   // 510：最长的牌子底边离字幕留出空（11-14 盲审：六个字的牌子快顶到字幕）
+    const win = abs(el('div', null, null, sc.el, { height: '760px', overflow: 'hidden' }), 0, LY + 3, 1080), rule = proRule(sc, LY);
+    const G = Pn.map((p, i) => {
+      const cx = PRO_CX + sp * (i - (n - 1) / 2), h = Math.round(units(p.text) * fs * 1.08 + 76);
+      const g = abs(el('div', null, null, win, { transformOrigin: '50% 0' }), cx - pw / 2, 0, pw);
+      abs(el('div', null, null, g, { width: '4px', height: '46px', background: 'var(--acc)' }), pw / 2 - 2, 0);
+      const pp = proPaper(g, 0, 44, pw, h);
+      abs(el('div', null, null, pp, { width: '16px', height: '16px', borderRadius: '50%', background: 'var(--acc)' }), pw / 2 - 8, 12);
+      el('div', 'big', vert(p.text), pp, { position: 'absolute', left: '0', top: '40px', width: pw + 'px', height: (h - 52) + 'px', writingMode: 'vertical-rl', textOrientation: 'upright', fontSize: fs + 'px', lineHeight: pw + 'px', letterSpacing: Math.round(fs * 0.08) + 'px', whiteSpace: 'nowrap', textAlign: 'center' });
+      return { g, pp, T: i ? proAt(sc, p.t) : sc.t0 + 0.35, h };   // 第一块跟着卡一起进来
+    });
+    return t => {
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      let cur = -1; G.forEach((g, i) => { if (t >= g.T - 0.1) cur = i; });
+      G.forEach((g, i) => {
+        const k = P(t, g.T - 0.1, g.T + tail, E.outB), d = t - g.T;
+        set(g.g, { o: P(t, g.T - 0.1, g.T + 0.05), y: (1 - k) * -(g.h + 80), r: d > 0 ? Math.sin(d * 9) * 3.2 * Math.exp(-d * 3.2) : 0 });
+        g.pp.style.outline = i === cur ? '5px solid var(--acc)' : 'none';
+      });
+    };
+  },
+  '圈重点'(sc) {     // 一张纸拍下来；说到那个词，词砸在纸上，记号笔圈一圈
+    const C = sc.cw, T = proAt(sc, C.t), n = Math.max(2, uW(C.text)), fs = Math.min(220, Math.floor(540 / n)), W = 740, H = 460, tail = PRO_TAIL['圈重点'];
+    const rule = proRule(sc), pp = proPaper(sc.el, PRO_CX - W / 2, 170, W, H);
+    proGrey(pp, 54, 44, 260); proGrey(pp, 54, 72, 170); proGrey(pp, 54, H - 66, W - 108); proGrey(pp, 54, H - 38, W - 260);
+    const tx = abs(el('div', 'big', C.text, pp, { height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fs + 'px', whiteSpace: 'nowrap', lineHeight: 1, transformOrigin: '50% 55%' }), 0, 108, W);
+    const rw = Math.min(W - 30, n * fs + 130), rh = Math.min(290, fs + 120);
+    const ring = proHand(pp, W / 2 - rw / 2, 233 - rh / 2, rw, rh, 13, C.li + 3);
+    SHAKES.push([T + 0.1, 6]);
+    return t => {
+      const k0 = P(t, sc.t0 + 0.05, sc.t0 + 0.5, E.outB); set(pp, { y: (1 - k0) * -70, r: 5 - 6.2 * k0 });
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      const kw = P(t, T - 0.04, T + 0.08); set(tx, { o: 0.2 + 0.8 * kw, s: 1 + 0.22 * Math.sin(Math.PI * P(t, T - 0.04, T + 0.3, E.outC)) });   // 词先淡淡地在纸上，说到才变实、鼓一下
+      ring(P(t, T + 0.12, T + tail));
+    };
+  },
+  _slips(sc, S, numbered) {   // 几张横着的纸条从上往下排，说到哪张哪张滑进来。带号的一级一级往右下错开、拐一根箭头（一步接一步）；不带号的左边一道色条、一左一右微微歪（几个要点）；sc.bubble：这几句是别人说的话，纸条画进一个对话框里
+    const bub = !numbered && sc.bubble, n = S.length, gap = 30, H = Math.min(170, Math.floor((600 - gap * (n - 1)) / n)), ind = !numbered ? 0 : n === 2 ? 120 : n === 3 ? 84 : 58;
+    const W = numbered ? 770 - ind * (n - 1) : bub ? 690 : 730, X0 = bub ? 128 : 100, HT = H * n + gap * (n - 1);
+    const Y0 = (bub ? 96 : 120) + Math.round((600 - HT) / 2), tail = PRO_TAIL[sc.kind], tx0 = numbered ? H + 28 : 58, avail = W - tx0 - 28;
+    const two = s => uW(s.text) > 8;                                           // 长的折成两行，字才够大（11-14 整片盲审：长短语别竖排）
+    let fs = Math.min(Math.floor(H * 0.5), Math.floor(avail / Math.max(...S.map(s => two(s) ? Math.ceil(uW(s.text) / 2) : uW(s.text)))));
+    if (S.some(two)) fs = Math.min(fs, Math.floor((H - 16) / 2.3));
+    const rule = bub ? null : proRule(sc, 70);
+    let bubble = null;
+    if (bub) {
+      const bw = W + 56, bh = HT + 56, r = 38, sv = svgBox(sc.el, X0 - 28, Y0 - 28, bw, bh);
+      bubble = svgEl('path', { d: `M${r} 0H${bw - r}Q${bw} 0 ${bw} ${r}V${bh - r}Q${bw} ${bh} ${bw - r} ${bh}H150L84 ${bh + 42}L96 ${bh}H${r}Q0 ${bh} 0 ${bh - r}V${r}Q0 0 ${r} 0Z`,
+        fill: 'color-mix(in srgb, var(--acc) 12%, transparent)', stroke: 'var(--acc)', 'stroke-width': 7, 'stroke-linejoin': 'round' }, sv);
+    }
+    const G = S.map((s, i) => {
+      const x = X0 + ind * i + (!numbered && !bub && i % 2 ? 40 : 0), y = Y0 + i * (H + gap), pp = proPaper(sc.el, x, y, W, H);
+      if (numbered) el('div', 'num', String(i + 1), pp, { position: 'absolute', left: '0', top: '0', width: H + 'px', height: H + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(H * 0.56) + 'px', letterSpacing: '0', background: 'var(--acc)', color: 'var(--accInk)', borderRadius: '11px 0 0 11px' });
+      else abs(el('div', null, null, pp, { height: (H - 44) + 'px', borderRadius: '7px', background: 'var(--acc)' }), 22, 22, 14);
+      const tb = el('div', null, null, pp, { position: 'absolute', left: tx0 + 'px', top: '0', width: avail + 'px', height: H + 'px', display: 'flex', alignItems: 'center' });
+      el('div', 'big', s.text, tb, Object.assign({ fontSize: fs + 'px' }, two(s) ? { lineHeight: 1.14, wordBreak: 'break-all', textWrap: 'balance' } : { whiteSpace: 'nowrap', lineHeight: 1 }));
+      const ar = numbered && i ? proArrow(sc.el, [[x - ind / 2, y - gap + 8], [x - ind / 2, y + H / 2], [x - 10, y + H / 2]], 8) : null;
+      return { pp, ar, T: i ? proAt(sc, s.t) : sc.t0 + 0.35, rot: numbered || bub ? 0 : (i % 2 ? 0.9 : -0.9) };   // 第一张跟着卡一起进来（整片盲审：卡进来了只有一根横线，空了一秒）
+    });
+    return t => {
+      if (rule) rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      if (bubble) dash(bubble, P(t, sc.t0 + 0.05, sc.t0 + 0.6, E.outC));
+      let cur = -1; G.forEach((g, i) => { if (t >= g.T - 0.1) cur = i; });
+      G.forEach((g, i) => {
+        const k = P(t, g.T - 0.1, g.T + tail, E.outB);
+        set(g.pp, { o: P(t, g.T - 0.1, g.T + 0.06), x: (1 - k) * 120, r: g.rot });
+        if (g.ar) g.ar(P(t, g.T - 0.28, g.T + 0.05, E.outC));
+        g.pp.style.outline = i === cur ? '5px solid var(--acc)' : 'none';
+      });
+    };
+  },
+  '一步接一步'(sc) { return PRO._slips(sc, sc.steps, true); },
+  '因果'(sc) {       // 上面一张纸写因，下面一张纸写果，一根箭头从因指到果
+    const A = sc.A, B = sc.B, TA = A.t <= B.t ? sc.t0 + 0.35 : proAt(sc, A.t), TB = B.t < A.t ? sc.t0 + 0.35 : proAt(sc, B.t), TM = Math.max(TA, TB), W = 660, X = PRO_CX - W / 2, tail = PRO_TAIL['因果'];
+    const fit = (s, cap) => Math.min(cap, Math.floor((W - 90) / Math.max(3, uW(s))));
+    const rule = proRule(sc, 70), pa = proPaper(sc.el, X, 110, W, 190), pb = proPaper(sc.el, X, 440, W, 250);
+    const txt = (pp, s, h, cap) => el('div', 'big', s, pp, { position: 'absolute', left: '0', top: '0', width: W + 'px', height: h + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fit(s, cap) + 'px', whiteSpace: 'nowrap', lineHeight: 1 });
+    txt(pa, A.text, 190, 92); txt(pb, B.text, 212, 124);
+    const ul = abs(el('div', null, null, pb, { height: '10px', borderRadius: '5px', background: 'var(--acc)', transformOrigin: '0 50%' }), 45, 204, W - 90);
+    const ar = proArrow(sc.el, [[PRO_CX, 320], [PRO_CX, 418]], 14);
+    SHAKES.push([TB + 0.12, 8]);
+    return t => {
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      const ka = P(t, TA - 0.1, TA + 0.3, E.outB); set(pa, { o: P(t, TA - 0.1, TA + 0.06), y: (1 - ka) * -60, r: -1.4 });
+      const kb = P(t, TB - 0.05, TB + 0.35, E.outB); set(pb, { o: P(t, TB - 0.05, TB + 0.1), s: 1.22 - 0.22 * kb, r: 1.2 });
+      ar(P(t, TM - 0.02, TM + 0.3, E.outC));
+      ul.style.transform = `scaleX(${P(t, TM + 0.12, TM + tail, E.outC).toFixed(4)})`;
+    };
+  },
+  '前后变化'(sc) {   // 一张纸：先写上原来的样子；说到后来，原来的划掉，新的砸在下面
+    const A = sc.A, B = sc.B, TA = sc.t0 + 0.35, TB = Math.max(proAt(sc, B.t), TA), W = 720, H = 560, tail = PRO_TAIL['前后变化'];
+    const rule = proRule(sc), pp = proPaper(sc.el, PRO_CX - W / 2, 130, W, H);
+    const fa = Math.min(96, Math.floor((W - 130) / Math.max(3, uW(A.text)))), fb = Math.min(150, Math.floor((W - 100) / Math.max(3, uW(B.text))));
+    const ta = abs(el('div', 'big', A.text, pp, { textAlign: 'center', fontSize: fa + 'px', whiteSpace: 'nowrap', lineHeight: 1 }), 0, 70 + Math.round((96 - fa) / 2), W);
+    const sw = Math.min(W - 60, uW(A.text) * fa + 56);
+    const strike = abs(el('div', null, null, pp, { height: '10px', borderRadius: '5px', background: PRO_INK, transformOrigin: '0 50%', opacity: 0 }), (W - sw) / 2, 113, sw);
+    const ar = proArrow(pp, [[W / 2, 200], [W / 2, 264]], 12);
+    const tb = abs(el('div', null, null, pp, { height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: '50% 50%' }), 0, 284, W);
+    el('div', 'big', B.text, tb, { fontSize: fb + 'px', whiteSpace: 'nowrap', lineHeight: 1 });
+    const ul = abs(el('div', null, null, pp, { height: '10px', borderRadius: '5px', background: 'var(--acc)', transformOrigin: '0 50%' }), 54, 496, W - 108);
+    SHAKES.push([TB + 0.12, 7]);
+    return t => {
+      const k0 = P(t, sc.t0 + 0.05, sc.t0 + 0.5, E.outB); set(pp, { y: (1 - k0) * -70, r: -5 + 4 * k0 });
+      rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
+      set(ta, { o: P(t, TA - 0.04, TA + 0.1) * (1 - 0.5 * P(t, TB - 0.05, TB + 0.2)), y: (1 - P(t, TA - 0.04, TA + 0.25, E.outC)) * 16 });
+      strike.style.transform = `scaleX(${P(t, TB - 0.08, TB + 0.14, E.outC).toFixed(4)})`; strike.style.opacity = t >= TB - 0.08 ? 0.85 : 0;
+      ar(P(t, TB - 0.02, TB + 0.22, E.outC));
+      set(tb, { o: P(t, TB - 0.02, TB + 0.1), s: 1.5 - 0.5 * P(t, TB, TB + 0.3, E.outC) });
+      ul.style.transform = `scaleX(${P(t, TB + 0.1, TB + tail, E.outC).toFixed(4)})`;
+    };
+  },
+  '时间先后'(sc) {   // 一根竖线从上往下走，走到哪个时候，哪张纸条滑出来：小牌写时候，大字写那时候的事
+    const V = sc.evs, n = V.length, top = 110, rowH = Math.floor(610 / n), Hs = Math.min(200, rowH - 24), LX = 136, X = 190, W = 870 - X, LH = rowH * n - 20, tail = PRO_TAIL['时间先后'];
+    const f1 = clampN(Math.round(Hs * 0.25), 34, 50), eh = Hs - f1 - 46;
+    abs(el('div', null, null, sc.el, { height: LH + 'px', borderRadius: '3px', background: 'var(--line)' }), LX - 3, top + 10, 6);
+    const run = abs(el('div', null, null, sc.el, { height: LH + 'px', borderRadius: '3px', background: 'var(--acc)', transformOrigin: '50% 0' }), LX - 3, top + 10, 6);
+    const G = V.map((v, i) => {
+      const cy = top + rowH * (i + 0.5), T = i ? proAt(sc, v.when.t) : sc.t0 + 0.35, Te = Math.max(proAt(sc, v.what.t), T);
+      const dot = abs(el('div', null, null, sc.el, { height: '30px', borderRadius: '50%', background: 'var(--acc)', boxShadow: '0 0 0 7px var(--bg0)' }), LX - 15, cy - 15, 30);
+      const pp = proPaper(sc.el, X, cy - Hs / 2, W, Hs);
+      abs(el('div', 'big', v.when.text, pp, { fontSize: f1 + 'px', lineHeight: 1, whiteSpace: 'nowrap', padding: '6px 18px 8px', borderRadius: '10px', background: 'var(--acc)', color: 'var(--accInk)' }), 28, 16);
+      const ev = abs(el('div', null, null, pp, { height: eh + 'px', display: 'flex', alignItems: 'center' }), 32, f1 + 36, W - 64);
+      el('div', 'big', v.what.text, ev, { fontSize: Math.min(eh - 4, 96, Math.floor((W - 64) / Math.max(3, uW(v.what.text)))) + 'px', lineHeight: 1, whiteSpace: 'nowrap' });
+      return { dot, pp, ev, T, Te, fr: (cy - top - 10) / LH };
+    });
+    return t => {
+      let reach = 0; G.forEach(g => { reach = lerp(reach, g.fr, P(t, g.T - 0.3, g.T, E.outC)); });
+      run.style.transform = `scaleY(${reach.toFixed(4)})`;
+      G.forEach(g => {
+        set(g.dot, { s: P(t, g.T - 0.08, g.T + 0.2, E.outB) });
+        set(g.pp, { o: P(t, g.T - 0.05, g.T + 0.1), x: (1 - P(t, g.T - 0.05, g.T + tail, E.outB)) * 90 });
+        set(g.ev, { o: P(t, g.Te - 0.03, g.Te + 0.15), y: (1 - P(t, g.Te - 0.03, g.Te + 0.25, E.outC)) * 12 });
+      });
+    };
+  },
+  '转折'(sc) {       // 上面一张纸写前半句；话锋一转，纸暗下去歪一点，一根箭头拐下来，后半句整块重点色砸在下面
+    const A = sc.A, B = sc.B, TA = sc.t0 + 0.35, TB = Math.max(proAt(sc, B.t), TA + 0.25), W = 640;
+    const pa = proPaper(sc.el, 100, 110, W, 220);
+    proText(pa, A.text, W - 70, 190, 92, PRO_INK);
+    const pb = abs(el('div', null, null, sc.el, { height: '270px', background: 'var(--acc)', borderRadius: '14px', boxShadow: '0 28px 60px rgba(0,0,0,.42)', transformOrigin: '50% 50%' }), 230, 430, W);
+    proText(pb, B.text, W - 70, 240, 120, 'var(--accInk)');
+    const ar = proArrow(sc.el, [[160, 352], [160, 565], [212, 565]], 14);
+    SHAKES.push([TB + 0.12, 8]);
+    return t => {
+      const ka = P(t, sc.t0 + 0.05, sc.t0 + 0.5, E.outB), dim = P(t, TB - 0.1, TB + 0.2);
+      const mv = 1 - P(t, TB - 0.45, TB - 0.05, E.outC);                     // 话锋转过来之前，前半句那张纸摆在中间、大一点；要转了才让到左上
+      set(pa, { o: P(t, sc.t0 + 0.05, sc.t0 + 0.2) * (1 - 0.45 * dim), x: 65 * mv, y: (1 - ka) * -60 + 170 * mv, s: 1 + 0.16 * mv, r: -2.2 - 1.2 * dim });
+      ar(P(t, TB - 0.28, TB + 0.02, E.outC));
+      set(pb, { o: P(t, TB - 0.03, TB + 0.1), s: 1.3 - 0.3 * P(t, TB - 0.03, TB + 0.32, E.outB), r: 1.4 });
+    };
+  },
+  '一好一坏'(sc) {   // 左右两张纸：好的那张顶上一道好色、打个勾；坏的那张顶上一道坏色、打个叉。先说哪个哪个在左
+    const W = 365, H = 500, Y = 130, tail = PRO_TAIL['一好一坏'];
+    const side = (S, x, from, first) => {
+      const pp = proPaper(sc.el, x, Y, W, H), T = first ? sc.t0 + 0.35 : proAt(sc, S.t);
+      abs(el('div', null, null, pp, { height: '150px', background: S.ok ? 'var(--good)' : 'var(--bad)', borderRadius: '11px 11px 0 0' }), 0, 0, W);
+      const sv = svgBox(pp, W / 2 - 52, 23, 104, 104), at = { fill: 'none', stroke: PRO_PAPER, 'stroke-width': 15, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+      const marks = (S.ok ? ['M16 56L42 82L90 26'] : ['M22 22L82 82', 'M82 22L22 82']).map(d => svgEl('path', Object.assign({ d }, at), sv));
+      const tb = abs(el('div', null, null, pp, { height: (H - 150) + 'px' }), 0, 150, W);
+      proText(tb, S.text, W - 50, H - 190, 88, PRO_INK);
+      return { pp, T, marks, from };
+    };
+    const G = [side(sc.A, 100, -1, true), side(sc.B, 505, 1, false)];
+    return t => G.forEach(g => {
+      const k = P(t, g.T - 0.05, g.T + tail, E.outB); set(g.pp, { o: P(t, g.T - 0.05, g.T + 0.12), x: (1 - k) * 150 * g.from, r: g.from * 1.4 * (2 - k) });
+      g.marks.forEach((m, i) => dash(m, P(t, g.T + 0.08 + i * 0.1, g.T + tail + i * 0.08)));
+    });
+  },
+};
+const PRO_SEEN = {};
+BUILD.pro = sc => { sc.late = true; const k = PRO_SEEN[sc.kind] = (PRO_SEEN[sc.kind] || 0) + 1; sc.alt = k % 2 === 0; return PRO[sc.kind](sc); };
 
 // ---------- 搭建 ----------
 function build() {

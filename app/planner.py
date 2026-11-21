@@ -338,7 +338,7 @@ def find_kw(text, num=True):
 
 
 # ---------- 分镜 ----------
-def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None):
+def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=None):
     """字 + 时间 → 剧本（见 juben.py）。theme 只为兼容旧调用留着，剧本里不放配色，配色归画风。
     audio_end：录音本身多长（片长 dur 可能补了空白）；用来判断录音停的时候话说没说完。"""
     if audio_end is None: audio_end = dur
@@ -635,6 +635,8 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None):
             bare = re.fullmatch(r'[\d.]+', ln['kw']) and not re.search(shuzi.MONEY_PRE, tx[:at_][-6:]) and not shuzi.unit_after(tx, at_ + len(ln['kw']))
             if cut_kw or bare: ln['kw'] = find_kw(ln['text'], num=False)   # 「是41」「58万亿度（前半在上一行）」不当强调词
     # 时间：镜头从第一句话前 0.15 秒开始，到下一个镜头开始为止
+    del PRO_LOG[:]
+    if pro: scenes = pro_place(scenes, lines, T, dur, pro)   # 1.4 专业版：云端挑的动画先占住那几句（pro 不给就和免费版一模一样）
     scenes = cards(scenes, lines, T, dur)   # 11-12 夜盲审七处：普通句卡按停顿分卡、模板做完要停住、数字卡对的数停够 0.8 秒，三样互相牵着，一起排到不再变（见 cards）
     if '句卡' in FIXES: para_fold_all(scenes, lines)                                      # 普通句卡的折点（一排最多八个字），按最后的卡算
 
@@ -816,6 +818,11 @@ def para_fold_all(scenes, lines):
         if sc['type'] == 'question' and PARA_RULE['问号卡']:   # 问号卡下面那句（11-12 夜总控）：照一句的普通句卡折，一排最多七个字；带软开头的两句各折各的，不拆卡
             for i in range(sc['la'], sc['lb']):
                 c = para_fold(lines[i], PARA_ROW1)
+                if c: lines[i]['pcut'] = c
+            continue
+        if sc['type'] == 'pro':                               # 1.4 专业版：动画卡盖住的句子也备好折点（修改页去掉这处动画后，这几句照普通句卡出）
+            r = para_card(lines, sc['la'], sc['lb'], None)
+            for i, c in (r[0] if r else {}).items():
                 if c: lines[i]['pcut'] = c
             continue
         if sc['type'] != 'say' or (sc.get('tpl') and sc['tpl']['kind'] in TPL_GRAPH): continue
@@ -1456,7 +1463,7 @@ def _tpl_time(S, lines, dur):
             done = lines[x['items'][-1][0]]['t0'] + 0.3
             if _fr_after(sc['t1'] - TPL_FADE) - _fr_up(done) < TPL_HOLD[x['kind']] + TPL_MARGIN - 1e-6: bad.add(li); continue
         else:
-            bor = TPL_TBORROW if nxt and nxt['type'] not in TPL_NUMCARD else 0.0   # 1.3.2：下一张是数字卡、年份卡、区间卡的不借
+            bor = TPL_TBORROW if nxt and nxt['type'] not in TPL_NUMCARD + ('pro',) else 0.0   # 1.3.2：下一张是数字卡、年份卡、区间卡的不借
             r = _text_hold(lines, x, sc['lb'], sc['t1'], bor, lines[nxt['la']]['t0'] if nxt else None)
             if r is None: bad.add(li); continue
             x['early'], x['stroke'], done, x['hold_to'] = r[0], round(r[1], 3), r[2], round(r[3], 3)
@@ -1518,7 +1525,7 @@ def cards(scenes, lines, T, dur):
         S, rej = cards_build(S, lines, T, dur, found, skip)
         timing(S, lines, dur)
         bad = _tpl_time(S, lines, dur) | rej
-        dem = num_demote(S, lines)
+        dem = num_demote(S, lines) + pro_demote(S, lines)
         if not bad and not dem: return S
         skip |= bad
     for sc in S: sc.pop('tpl', None)
@@ -1774,3 +1781,161 @@ def try_list(T, i):
     if len(items) < 2: return None
     if not title: title = f'{len(items)} 个要点'
     return k, title, items
+
+
+# ---------- 专业版动画（1.4，2026-11-14 立） ----------
+# 云端模型挑的动画（xieshou 用 donghua.check_all 查过的）排进卡里：盖住的那几句换成一张 type='pro' 的卡，底下字幕照出。
+# 排不进去的（盖到开场、收尾，只盖住清单、对比这类卡的一部分，做完停不够 0.8 秒）整处不要，那几句照免费版的画法走。
+# plan(..., pro=None)：不给 pro，下面这些一行都不跑，免费版的排法一点不变。
+PRO_HOLD = 0.8                                      # 最后一样东西落定后，到卡开始淡出，至少停这么久（此前 11-14 夜放到 0.5，现改回 0.8，因为整片盲审指出三处牌子约 1 秒就没了；总控令改回）
+PRO_EAT = ('stat', 'range', 'year', 'question')     # 动画只盖住这几种卡的一部分时，连整张一起盖（它们只是一两句话换个画法）
+PRO_BORROW = 1.5                                    # 往后多盖的那句最长几秒：再长，画面停在上一件事上、嘴已经说了半天下一件事（11-14 盲审：预算 1000 块那张纸多赖了两秒多）
+PRO_SPAN = 5                                        # 连盖带往后借，一张动画卡最多几句
+PRO_OWN = 3.0                                       # 模型自己圈进来、但卡上没有它的字的那句，拿来停够时最长几秒
+PRO_NUMK = ('亮出大数', '占多少', '比多少', '几组对比')   # 带数的动画：只有它们可以把免费版的大数字卡换掉
+PRO_IN = 0.35                                       # 卡自己露满要多久（和 seek.js 的 sc.late 一个数）
+PRO_TAIL = {'亮出大数': 0.3, '占多少': 0.45, '比多少': 0.55, '几组对比': 0.55, '并排对照': 0.4, '几个要点': 0.3, '圈重点': 0.5, '一步接一步': 0.35, '因果': 0.45, '前后变化': 0.45, '时间先后': 0.35, '转折': 0.45, '一好一坏': 0.4}   # 一样东西从开口到落定（和 seek.js 的 PRO_TAIL 一个数，两边一起改）
+PRO_LOG = []                                        # 这次哪几处没排进去、为什么（交付说明照实报用）
+
+
+def _pro_at(lines, at, w):
+    """这几个字在哪句、什么时候开口。at = (第几句, 第几个字)，donghua 查的时候记的。"""
+    whole = w in ''.join(c[0] for c in lines[at[0]]['cs'])       # 被字幕断成两行的字：这一行里找不到整个词，按它开头那个字算
+    return dict(text=w, li=at[0], t=round(char_time(lines, at[0], w) if whole else idx_time(lines, at[0], at[1]), 3))
+
+
+def pro_card(a, lines):
+    """查过的一处动画 → 画这张卡要的东西（不含 la / lb / t0 / t1）。字都是字幕原样的字，时刻是说到它的那一刻。"""
+    import donghua
+    k, at = a['类型'], a['at']
+
+    def num(w, pos, val=None):
+        q, n, u = donghua.num_split(w)
+        d = dict(_pro_at(lines, pos, w), pre=q, n=n, u=u)
+        if val is not None: d['val'] = val
+        return d
+    lab = lambda key: _pro_at(lines, at[key], a[key]) if a.get(key) and key in at else None
+    c = dict(kind=k)
+    if k == '亮出大数': c.update(num=num(a['数'], at['数']), what=lab('什么'))
+    elif k == '占多少': c.update(num=num(a['数'], at['数'], a['val']['数']), what=lab('什么'))
+    elif k == '比多少': c['rows'] = [dict(name=lab(x), num=num(a[x + '数'], at[x + '数'], a['val'][x + '数'])) for x in ('甲', '乙')]
+    elif k == '几组对比': c['rows'] = [dict(name=_pro_at(lines, g['at']['名'], g['名']), num=num(g['数'], g['at']['数'], g['val'])) for g in a['组']]
+    elif k == '并排对照': c.update(L=dict(name=lab('左'), say=lab('左说')), R=dict(name=lab('右'), say=lab('右说')))
+    elif k == '圈重点': c['cw'] = lab('词')                                    # 11-14 夜加的五种：普通的话也配得上
+    elif k == '一步接一步': c['steps'] = [_pro_at(lines, pos, w) for w, pos in zip(a['步'], at['步'])]
+    elif k == '因果': c.update(A=lab('因'), B=lab('果'))
+    elif k == '前后变化': c.update(A=lab('前'), B=lab('后'))
+    elif k == '转折': c.update(A=lab('前半'), B=lab('后半'))
+    elif k == '一好一坏': c['A'], c['B'] = sorted((dict(lab('好'), ok=True), dict(lab('坏'), ok=False)), key=lambda x: x['t'])   # 先说哪个哪个在左
+    elif k == '时间先后': c['evs'] = [dict(when=_pro_at(lines, g['at']['时'], g['时']), what=_pro_at(lines, g['at']['事'], g['事'])) for g in a['时间点']]
+    else: c['pts'] = [_pro_at(lines, pos, w) for w, pos in zip(a['点'], at['点'])]
+    return c
+
+
+def pro_marks(c):
+    """这张卡上一样一样东西开口的时刻。"""
+    k = c['kind']
+    if k in ('亮出大数', '占多少'): return [c['num']['t']]
+    if k in ('比多少', '几组对比'): return [r['num']['t'] for r in c['rows']]
+    if k == '并排对照': return [x['t'] for sd in (c['L'], c['R']) for x in (sd['name'], sd['say']) if x]
+    if k == '圈重点': return [c['cw']['t']]
+    if k == '一步接一步': return [x['t'] for x in c['steps']]
+    if k in ('因果', '前后变化', '转折', '一好一坏'): return [c['A']['t'], c['B']['t']]
+    if k == '时间先后': return [x['t'] for g in c['evs'] for x in (g['when'], g['what'])]
+    return [x['t'] for x in c['pts']]
+
+
+def pro_done(c, t0):
+    """最后一样东西落定的时刻：说到它以后 PRO_TAIL 秒；卡刚进来就说到的，等卡露满再算。"""
+    return max(max(pro_marks(c)), t0 + PRO_IN) + PRO_TAIL[c['kind']]
+
+
+def pro_hold(c, t0, t1):
+    return _fr_after(t1 - TPL_FADE) - _fr_up(pro_done(c, t0))
+
+
+def _pro_no(a, la, lb, lines, why):
+    PRO_LOG.append(dict(kind=a.get('类型') or a.get('kind'), la=la, lb=lb, text=' / '.join(_ltxt(lines, i) for i in range(la, lb)), why=why))
+
+
+def pro_parts(c):
+    """这张卡上写的每一样东西（字、在哪句、什么时候开口）。"""
+    k = c['kind']
+    if k in ('亮出大数', '占多少'): xs = [c['num'], c.get('what')]
+    elif k in ('比多少', '几组对比'): xs = [y for r in c['rows'] for y in (r['num'], r.get('name'))]
+    elif k == '并排对照': xs = [x for sd in (c['L'], c['R']) for x in (sd['name'], sd['say'])]
+    elif k == '圈重点': xs = [c['cw']]
+    elif k == '一步接一步': xs = c['steps']
+    elif k in ('因果', '前后变化', '转折', '一好一坏'): xs = [c['A'], c['B']]
+    elif k == '时间先后': xs = [x for g in c['evs'] for x in (g['when'], g['what'])]
+    else: xs = c['pts']
+    return [x for x in xs if x]
+
+
+def _pro_tight(c, lines):
+    """卡上的字实际落在哪几句：[最前一句, 最后一句 + 1)。被字幕断成两行的字，下一句也算。"""
+    ls = set()
+    for x in pro_parts(c):
+        ls.add(x['li'])
+        if x['text'] not in ''.join(q[0] for q in lines[x['li']]['cs']) and x['li'] + 1 < len(lines): ls.add(x['li'] + 1)
+    return min(ls), max(ls) + 1
+
+
+def pro_place(scenes, lines, T, dur, pro):
+    """把查过的动画排进去（分卡之前）。scenes：plan 认出来的句型段落（还没分卡、没定时间）；pro：donghua.check_all 合格的那几处。
+    11-14 傍晚（整片盲审之后）：卡只盖字实际占的那几句（前头没有字的句子还给普通句卡，卡一进来就有东西，不再只剩一根横线）；
+    不带数的动画不许盖免费版的大数字卡、年份卡（那张本来更好看）；免费版已经一条一条排开的清单不重复；盖到对话框的，纸条画进对话框里。"""
+    n = len(lines)
+    S = [dict(x) for x in scenes]
+    found0 = tpl_find(S, lines, T) if '模板' in FIXES else {}       # 免费版在这些句子上本来会画什么
+    para0 = {i for g in found0.values() if g['kind'] == 'para' for i in range(g['first'], g['end'] + 1)}
+    quote0 = {i for i, g in found0.items() if g['kind'] == 'quote'}
+    t1_of = lambda e: lines[e]['t0'] - 0.15 if e < n else dur
+    enough = lambda c, t0, e: pro_hold(c, t0, t1_of(e)) >= PRO_HOLD + TPL_MARGIN - 1e-6
+    want = [(a['la'], a['lb']) for a in pro]                # 别的动画要的句子，往后借的时候不许占
+    for a in sorted(pro, key=lambda a: (a['la'], a['lb'])):
+        c = pro_card(a, lines)
+        f, e = _pro_tight(c, lines)
+        la, lb = max(a['la'], f), min(a['lb'], e)
+        numk = c['kind'] in PRO_NUMK
+        hit = [k for k, x in enumerate(S) if x['la'] < lb and x['lb'] > la]
+        why = '' if hit else '这几句不在片子里'
+        for k in hit:
+            x = S[k]
+            if k == 0 or x['type'] in ('hook', 'cta', 'pro'): why = '盖到了开场、收尾或者另一处动画'; break
+            if not numk and x['type'] in TPL_NUMCARD: why = '这几句里免费版本来有一张大数字卡，不盖'; break
+            if x['type'] == 'say' or (x['la'] >= la and x['lb'] <= lb): continue
+            if x['type'] in PRO_EAT: la, lb = min(la, x['la']), max(lb, x['lb']); continue
+            why = '只盖住了一张清单、对比这类卡的一部分'; break
+        if not why and c['kind'] == '几个要点':
+            if any(i in para0 for i in range(la, lb)): why = '这几句免费版本来就一条一条排开了，不重复'
+            elif any(i in quote0 for i in range(la, lb)): c['bubble'] = True
+        if not why and lb - la > PRO_SPAN: why = '连着盖的句子太多'
+        if why: _pro_no(a, a['la'], a['lb'], lines, why); continue
+        t0 = max(0.0, lines[la]['t0'] - 0.15)
+        if not enough(c, t0, lb):                      # 停不够：往后多盖一句（那句得是普通句卡里的，字幕照出）。模型自己圈进来的那句可以长一点，借来的最长 PRO_BORROW 秒
+            nx = next((x for x in S[1:] if x['la'] <= lb < x['lb']), None)
+            own = lb < a['lb']
+            if (nx and nx['type'] == 'say' and lb - la < PRO_SPAN and (own or not any(x <= lb < y for x, y in want))
+                    and lines[lb]['t1'] - lines[lb]['t0'] <= (PRO_OWN if own else PRO_BORROW) and enough(c, t0, lb + 1)): lb += 1
+            else: _pro_no(a, la, lb, lines, f'落定以后停不够 {PRO_HOLD} 秒'); continue
+        out, put = [], False
+        for x in S:
+            if x['lb'] <= la or x['la'] >= lb: out.append(x); continue
+            if x['type'] == 'say' and x['la'] < la: out.append(dict(type='say', la=x['la'], lb=la, icon=scene_icon(''.join(T[x['la']:la]))))
+            if not put: out.append(dict(type='pro', la=la, lb=lb, **c)); put = True
+            if x['type'] == 'say' and x['lb'] > lb: out.append(dict(type='say', la=lb, lb=x['lb'], icon=scene_icon(''.join(T[lb:x['lb']]))))
+        S = out
+    return S
+
+
+def pro_demote(S, lines):
+    """分完卡、定完时间再核一遍：前后的卡一挤，动画停不够了，这张不要，那几句照普通句卡走。返回改了几张。"""
+    n = 0
+    for k, sc in enumerate(S):
+        if sc['type'] != 'pro': continue
+        if pro_hold(sc, sc['t0'], sc['t1']) >= PRO_HOLD + TPL_MARGIN - 1e-6:
+            sc['done'] = round(pro_done(sc, sc['t0']), 3); continue
+        _pro_no(sc, sc['la'], sc['lb'], lines, f'前后的卡一挤，落定以后停不够 {PRO_HOLD} 秒')
+        S[k] = dict(type='say', la=sc['la'], lb=sc['lb'], icon=None); n += 1
+    return n

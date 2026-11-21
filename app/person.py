@@ -1,5 +1,6 @@
 # 真人画面：从视频里抽帧，找人脸位置，交给画面页做「人在上、卡在下」。全部本机跑。
 import json, os, re, subprocess
+NOWIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)      # 11-20：软件改成不开黑框跑以后，调 ffmpeg 别每次闪一个黑框（Windows 才有这个开关，别处是 0）
 from pathlib import Path
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")  # 不往黑窗口刷英文警告
 import numpy as np
@@ -13,7 +14,7 @@ STEP = 15  # 每 15 帧（半秒）找一次脸
 
 def has_video(src, ffmpeg):
     """文件里有没有真画面（mp3 的专辑封面不算）。"""
-    r = subprocess.run([ffmpeg, '-hide_banner', '-i', str(src)], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    r = subprocess.run([ffmpeg, '-hide_banner', '-i', str(src)], capture_output=True, text=True, encoding='utf-8', errors='ignore', creationflags=NOWIN)
     return any('Video:' in l and 'attached pic' not in l for l in r.stderr.splitlines())
 
 
@@ -23,7 +24,7 @@ def extract(src, out, dur, ffmpeg):
     for f in out.glob('*.jpg'): f.unlink()
     vf = (f"fps={FPS},scale=w='if(lt(iw,ih),min(1080,iw),-2)':h='if(lt(iw,ih),-2,min(1080,ih))'")
     subprocess.run([ffmpeg, '-y', '-loglevel', 'error', '-i', str(src), '-t', f'{dur:.2f}', '-vf', vf, '-q:v', '4',
-                    '-start_number', '0', str(out / '%05d.jpg')], check=True)
+                    '-start_number', '0', str(out / '%05d.jpg')], check=True, creationflags=NOWIN)
     n = len(list(out.glob('*.jpg')))
     if n == 0: raise RuntimeError('无法从视频中提取画面，文件可能已损坏。请重新导出后再试。')
     return n
