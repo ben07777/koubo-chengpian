@@ -17,26 +17,36 @@ h2{font-size:18px;margin:18px 0 6px}h2:first-child{margin-top:0}ul{margin:0;padd
 .qrBox{width:240px;min-height:240px;border:2px dashed #CFC6B6;border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--sub);padding:12px;background:#fff}
 .qrBox.on{border:1px solid var(--line);padding:0;min-height:0}#qrImg{width:100%;border-radius:10px;display:block}
 .mail{margin-top:14px!important;font-size:15px}
+.refundNear{margin-top:12px!important;font-size:17px;font-weight:bold}
+.duibi{margin:6px 0 18px}.duibi h2{margin-top:6px}
+.duibi video{width:100%;max-width:360px;display:block;margin:6px auto;border-radius:12px;background:#000}
 @media(max-width:620px){.buy{grid-template-columns:1fr}.qrBox{margin:0 auto}}
 </style></head><body><div class="wrap">
-<!-- 11-09 开卖版（他说「赶紧上架产品吧」）。这一页只写：开卖那句话、用完或到期会怎样、怎么买怎么填码、退款，外加发什么出去和公示那两句。
-     11-09 第三轮：价钱、购买链接读软件包里的 开卖.json；11-17 起收款码只放服务器上（总控定），经 /api/shoukuanma 向中转要，只走加密的路，要到了才露那一行。
-     条数、期限、退款那几句、模型名、备案号问中转（经 /api/pro 来），页面里一个数都不写死。本地没配价钱、两样都空着时写「还没开卖」，不出死链接、不出空图。上架清单里禁用的那四个词一个都不写，不催买。打开时告诉中转加一次数（什么内容都不发）。 -->
+
 <h1>了解专业版</h1>
 <div class="card">
   <p class="one" id="line">正在查……</p>
+  <p class="one" id="tryLine" hidden>每台电脑先免费试 <b id="tryN"></b> 条，不用填码（试用全站每天有名额，满了第二天再来）。</p>
   <p class="tip" id="noN" hidden>现在连不上云端，条数和期限暂时查不到。云端连上以后再打开这一页。</p>
   <p class="tip" id="noSet" hidden>云端连上了，但条数和期限还没设好，暂时查不到。过一阵再打开这一页。</p>
-  <!-- 11-20 界面（他说勾选框「找了半天都没找到」）：怎么付钱挪到价钱正下方一块，勾选框做大；勾上以后收款码就出在右边那一格（窄窗口在正下方）。不默认勾，勾了才露码，句子原样。 -->
+
   <div class="buy" id="buyBox" hidden>
     <div>
       <p id="buyYes" hidden><a id="buyLink" target="_blank" rel="noopener noreferrer">打开购买页面</a>，付完钱会拿到一串次数码。</p>
       <div id="buyQr" hidden><p class="qrLine" id="qrLine"></p><label class="agree"><input type="checkbox" id="agree"> 我知道：这是在线交付的软件，填码激活以后，不适用七日无理由退货。</label></div>
+      <p class="refundNear" id="refundNear" hidden></p>
       <p class="mail" id="mailLine" hidden>没收到码、要退款，发邮件到 <b id="mail"></b>。</p>
+      <p class="mail" id="forgotLine" hidden>付款时忘了写邮箱：发邮件到 <b id="mail2"></b>，附上付款截图。</p>
     </div>
     <div class="qrBox" id="qrBox" hidden><span id="agreeTip">勾上以后才出收款码。</span><img id="qrImg" alt="收款码" style="display:none"></div>
   </div>
-  <ul>      <!-- 11-17 夜总控定：开卖页照实写「出来的是底稿」「适合五分钟以内的口播」 -->
+
+  <div class="duibi" id="duibiBox" hidden>
+    <h2>同一段录音，两种出法</h2>
+    <video id="duibiV" controls playsinline preload="metadata"></video>
+    <p class="tip">同一段录音，免费版和专业版各出一条，并排放着。</p>
+  </div>
+  <ul>
     <li>适合五分钟以内的口播。</li>
     <li>专业版眼下只给声音配画面。导入视频时，首页「保留原画面」那一格默认勾着：保留原画面，不用云端，不扣条数。去掉勾，只用视频里的声音，画面全换成配的。</li>
     <li>云端排出来的画面是底稿：出完片在修改页看一遍，不对的那张点 × 去掉，再点「重新生成」。</li>
@@ -53,9 +63,9 @@ h2{font-size:18px;margin:18px 0 6px}h2:first-child{margin-top:0}ul{margin:0;padd
 
   <h2>怎么买、怎么填码</h2>
   <ul>
-    <li id="buyNo">还没开卖。</li>
+    <li id="buyNo">付款那一块暂时出不来，多半是连不上云端。连上网以后再打开这一页。</li>
     <li id="buyHere" hidden>怎么付钱，见这一页最上面价钱下方那一块。</li>
-    <li>回到软件首页，把次数码填进云端开关下面「次数码」那一格，点「保存」。开关旁会写还剩几条、有效期。</li>
+    <li>回到软件首页，在「把字幕文字发到云端」那一格下面，有个「次数码」框。把码填进去，点「保存」，再勾上「把字幕文字发到云端」。那一行左边会写「专业版：云端还剩几条」。</li>
     <li>码不绑电脑，换电脑、两台电脑一起用都行，条数是总数。</li>
   </ul>
 
@@ -74,7 +84,6 @@ h2{font-size:18px;margin:18px 0 6px}h2:first-child{margin-top:0}ul{margin:0;padd
     <li>条数按录音算：同一条录音改了字幕、改了画面、换了样子重新生成，都不另算；录音剪过、转过格式再导入，算新的一条。云端没排成的不算。</li>
     <li>云端排一条，最多等 <span id="waitN">一分多钟</span>。长稿会分几段同时排。哪几句没按时回来、没通过检查，或者云端没给词，那几句用你电脑上排的词。真用上云端词的句子不到一半，这条不扣。</li>
     <li>在修改页重新生成时，字幕没改、云端开关没动的话，画面沿用上一次排的。</li>
-    <li id="tryLine" hidden>没填次数码的，每台电脑可以免费试 <b id="tryN"></b> 条（试用全站每天有名额，满了第二天再来）。</li>
   </ul>
   <p class="tip">云端排画面使用<span class="mdl">云端模型</span><span id="beianPart" hidden>，算法备案号：<span id="beian"></span></span>。云端只从你说的话里挑词排画面，不替你写内容，结果只给你自己看。</p>
 </div>
@@ -83,41 +92,45 @@ h2{font-size:18px;margin:18px 0 6px}h2:first-child{margin-top:0}ul{margin:0;padd
 <script>
 fetch('/api/liaojie', { method: 'POST', body: '{}' }).catch(() => {});
 const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
+const SHOW_DUIBI = false;
+if (SHOW_DUIBI) { const v = $('#duibiV'); v.onloadedmetadata = () => { $('#duibiBox').hidden = false; }; v.src = '/web/duibi.mp4'; }
 const noN = set => { $(set === true ? '#noSet' : '#noN').hidden = false; $('#line').textContent = '专业版：云端排画面按条数收费，一次付费，用完或到期就停，软件照常能用。'; };
-const buy = j => {                                                     // 价钱、购买链接是软件包里的，连不上云端也照样出（11-10 复审第 11 条）；收款码向中转要，要不到就照样写「还没开卖」（11-17）
+const buy = j => {
   const link = String(j['链接'] || ''), mail = String(j['邮箱'] || '');
   const open = () => { $('#buyBox').hidden = false; $('#buyNo').hidden = true; $('#buyHere').hidden = false; };
-  if (/^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{3,200}$/.test(mail)) { $('#mail').textContent = mail; $('#mailLine').hidden = false; }   // 联系邮箱读本机 开卖.json（11-20）
+  if (/^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{3,200}$/.test(mail)) { $('#mail').textContent = mail; $('#mail2').textContent = mail; $('#mailLine').hidden = false; }
   if (/^https:\/\/[^\s"<>\\]{4,500}$/.test(link)) { $('#buyLink').href = link; $('#buyYes').hidden = false; $('#buyBox').classList.add('noqr'); open(); }
-  else if (j['收款码'] === true && j['收款码说明']) {                 // 怎么买的第二种：收款码 + 说明（两样都填了只出购买链接）。图出来了才露这一块，出不来照样写「还没开卖」
+  else if (j['收款码'] === true && j['收款码说明']) {
     const img = $('#qrImg'); $('#qrLine').textContent = j['收款码说明'];
-    img.onload = () => { $('#buyQr').hidden = false; $('#qrBox').hidden = false; open(); };
-    $('#agree').checked = false; $('#agree').onchange = () => { const on = $('#agree').checked; img.style.display = on ? 'block' : 'none'; $('#agreeTip').style.display = on ? 'none' : 'block'; $('#qrBox').classList.toggle('on', on); };   // 11-17 总控定：付款前要自己勾，不默认勾；勾了才露收款码
+    img.onload = () => { $('#buyQr').hidden = false; $('#qrBox').hidden = false; $('#forgotLine').hidden = $('#mailLine').hidden; open(); };
+    $('#agree').checked = false; $('#agree').onchange = () => { const on = $('#agree').checked; img.style.display = on ? 'block' : 'none'; $('#agreeTip').style.display = on ? 'none' : 'block'; $('#qrBox').classList.toggle('on', on); };
     img.src = '/api/shoukuanma?t=' + Date.now();
   }
 };
 fetch('/api/pro').then(r => r.json()).then(j => {
   $$('.mdl').forEach(x => x.textContent = j.model || '云端模型');
-  if (typeof j['备案号'] === 'string' && j['备案号'].trim()) { $('#beian').textContent = j['备案号'].trim(); $('#beianPart').hidden = false; }   // 备案号从配置来（11-09 第三轮），没有就不写这半句
-  if (!Number.isInteger(j['条'])) {                                   // 条数、期限是服务器发码时真给的：问不到就说「连不上」；连上了却缺数说「还没设好」
+  if (typeof j['备案号'] === 'string' && j['备案号'].trim()) { $('#beian').textContent = j['备案号'].trim(); $('#beianPart').hidden = false; }
+  if (!Number.isInteger(j['条'])) {
     noN(j['连上'] === true);
-    if (j['价钱'] && j['价钱句']) { $('#line').textContent = j['价钱句']; buy(j); }   // 11-10：本地配了价钱，价钱和怎么买照样写，只是条数、期限查不到
+    if (j['价钱'] && j['价钱句']) { $('#line').textContent = j['价钱句']; buy(j); }
     return;
   }
   $$('.n').forEach(x => x.textContent = j['条']);
   const term = j['期限'] || (j['天'] === 365 ? '一年' : j['天'] + ' 天');
   $$('.term').forEach(x => x.textContent = term);
-  const site = j['全站每天'];                                            // 全站每天最多排几次（中转配置来的）：有数就明写，0 = 不拦填了码的，不写这一行
+  const site = j['全站每天'];
   if (Number.isInteger(site) && site > 0) $('#siteLine').textContent = '全站每天最多排 ' + site + ' 次（同一条录音重出也算一次），满了当天改在你电脑上排，不扣你的条数。';
   else if (site === 0) $('#siteLine').hidden = true;
-  if (Number.isInteger(j['等']) && j['等'] > 0) $('#waitN').textContent = j['等'] + ' 秒';   // 一条最多排几秒（中转配置来的，11-09 复审轻 1）
-  if (Number.isInteger(j['天'])) $('#daysNote').textContent = '，连那天一共 ' + j['天'] + ' 天';   // 「一年」按 365 天算，写明
+  if (Number.isInteger(j['等']) && j['等'] > 0) $('#waitN').textContent = j['等'] + ' 秒';
+  if (Number.isInteger(j['天'])) $('#daysNote').textContent = '，连那天一共 ' + j['天'] + ' 天';
   if (Number.isInteger(j['试用']) && j['试用'] > 0) { $('#tryN').textContent = j['试用']; $('#tryLine').hidden = false; }
-  if (!(j['那句话'] && j['价钱'])) { $('#line').textContent = '专业版：云端排画面按条数收费，一次付费，用完或到期就停，软件照常能用。'; return; }   // 本地 开卖.json 没配价钱：还没开卖
+  if (!(j['那句话'] && j['价钱'])) { $('#line').textContent = '专业版：云端排画面按条数收费，一次付费，用完或到期就停，软件照常能用。'; $('#buyNo').textContent = '还没开卖。'; return; }
   $('#line').textContent = j['那句话'];
   buy(j);
   const rf = Array.isArray(j['退款']) ? j['退款'].filter(x => typeof x === 'string' && x.trim()) : [];
   if (rf.length) { rf.forEach(x => { const li = document.createElement('li'); li.textContent = x; $('#refund').appendChild(li); }); $('#refundBox').hidden = false; }
+  const near = rf.find(x => x.includes('没用过'));
+  if (near) { $('#refundNear').textContent = near.replace(/（[^）]*）/g, ''); $('#refundNear').hidden = false; }
 }).catch(noN);
 </script>
 </body></html>

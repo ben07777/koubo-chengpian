@@ -6,7 +6,7 @@
 #      认不准的整处不要，那几句照没有画面的排法出（宁可少出，不许配错意思）。
 #   3 place：排卡。说完就走，最后一样东西说到以后至少停 1.3 秒，不够往后借一句；盖到开场、收尾的不要。
 # 画面在出片网页里还有一道（画风\字卡\专业版\）：字不在字幕里、出框、出错的那张当场退回一屏一句。
-import collections, json, re
+import collections, difflib, json, re
 from pathlib import Path
 import donghua
 
@@ -555,9 +555,68 @@ def suipian(c, T):
             raise donghua.Bad(f'「{w}」带着「他、这、那、哪」这样的字，原话后面还连着「{tail[:10]}」，单看不知道在说谁、说什么：抄完整，或者换成说得清楚的词')
 
 
-def check_all(items, lines, K, sp=None):
+# ───────────── 2.7 照起止取字（2026-11-22 总控令）：模型抄的字和字幕差一两个字，不再整处退回 ─────────────
+# 第九份真答卷里，挑中的画面一半被退，多数是「不是这几句字幕里原样连着的字」：模型把「更好开的」抄成「更好的」、「AIA」抄成「AI」。
+# 办法：这一处画面本来就报了从第几句到第几句。哪一栏的字在这几句里找不到原样的，只认它写的头两个字和尾两个字，
+# 在这几句字幕里找「头两个字开头、尾两个字收尾」的那一截，上屏的字换成字幕里这一截原样的字。中间的字一律照字幕，不照模型写的。
+# 不放宽：换上去的字就是字幕原文，后面查截得完不完整、半句话、带指代、查意思，全照旧一道不少。
+# 只救原来过不了的：原来就过得了的一个字不动（照旧走 fit 和 gate）；过不了的才照起止取一次字，再从头查一遍。
+# 不取的：带「数」的栏（数必须原样）、4 个字以下的、取出来比写的多了或少了「不、没」这类否定字的、取出来的数和写的数不一样的、
+#         长短差太多的（取出来短于写的六成、长于写的一倍半加两个字）、和写的像不到六成的。
+QIZHI = True                    # 开关。软件这头默认开；中转那头照软件报的版本号决定（见中转的 wants_qz）
+QZ_MIN = 4                      # 写的字至少几个，才照起止取字
+QZ_RATIO = 0.6                  # 取出来那一截和写的至少像几成（difflib 的比法）
+QZ_SKIP = FIT_SKIP
+
+
+def _qz_find(w, span):
+    """w：模型写的字（去过符号）；span：这几句字幕连起来（去过符号）。回字幕里照 w 的头两个字、尾两个字找到的那一截；找不到、不放心的回 None。"""
+    h, t = w[:2], w[-2:]; lo, hi = max(3, int(len(w) * 0.6)), int(len(w) * 1.5) + 2; best = None
+    i = span.find(h)
+    while i >= 0:
+        j = span.find(t, i + 1)
+        while j >= 0:
+            c = span[i:j + len(t)]
+            if len(c) > hi: break
+            if len(c) >= lo:
+                r = difflib.SequenceMatcher(None, w, c).ratio()
+                if best is None or r > best[0] + 1e-9: best = (r, c)
+            j = span.find(t, j + 1)
+        i = span.find(h, i + 1)
+    if not best or best[0] < QZ_RATIO: return None
+    c = best[1]
+    if sorted(NEGCH.findall(_mask(c))) != sorted(NEGCH.findall(_mask(w))): return None       # 多了或少了否定字：意思可能反了，不取
+    if re.findall(r'\d+(?:\.\d+)?', c) != re.findall(r'\d+(?:\.\d+)?', w): return None   # 数对不上，不取
+    return c
+
+
+def qizhi(a, T):
+    """一处画面里，在那几句字幕里找不到原样的栏，照头尾两个字换成字幕原文。回 (换过的项, [{栏, 写的, 取的}])；一栏都没换回 (None, None)。"""
+    try: la, lb = int(a.get('从')) - 1, int(a.get('到'))
+    except (TypeError, ValueError, OverflowError): return None, None
+    if isinstance(a.get('从'), bool) or not 0 <= la < lb <= len(T) or lb - la > 12: return None, None
+    span = norm(''.join(T[la:lb])); log = []
+
+    def one(v, key):
+        if not isinstance(v, str) or '数' in key: return v
+        w = norm(v)
+        if len(w) < QZ_MIN or w in span: return v
+        c = _qz_find(w, span)
+        if c is None: return v
+        log.append(dict(栏=key, 写的=w, 取的=c)); return c
+
+    def walk(x, key=''):
+        if isinstance(x, dict): return {k: (v if k in QZ_SKIP else walk(v, k)) for k, v in x.items()}
+        if isinstance(x, list): return [walk(v, key) for v in x]
+        return one(x, key)
+    b = walk(a)
+    return (b, log) if log else (None, None)
+
+
+def check_all(items, lines, K, sp=None, qz=None):
     """云端配的画面逐处查。返回 (合格的（排卡要的样子，按先后）, 拦下的 [{项, 原因}])。
-    sp：碎片那三条拦不拦；不给就照上面的开关 SUIPIAN。中转那头把关时给 False（见中转.py 的 pick_scenes）。"""
+    sp：碎片那三条拦不拦；不给就照上面的开关 SUIPIAN。中转那头把关时给 False（见中转.py 的 pick_scenes）。
+    qz：过不了的那处照起止取一次字再查（见 2.7）；不给就照开关 QIZHI。照起止取过字才过的，卡上记一笔「取字」。"""
     n = len(lines)
     T = [re.sub(r'\s+', '', ''.join(c[0] for c in l['cs'])) for l in lines]
     sc = scale_of(n)
@@ -578,7 +637,8 @@ def check_all(items, lines, K, sp=None):
                 if k_ not in ('类型', '从', '到', '图标'): x[k_] = _neg(x[k_], f_, t_)
     except Exception: pass
     good, held = [], []
-    for a in items:
+
+    def one(a):                                            # 一处照原来的规矩查：过了回卡，不过抛 donghua.Bad（原因是中文）
         note = None
         try:
             b, T2, L2, note = fit(a, T, lines, K)
@@ -588,14 +648,23 @@ def check_all(items, lines, K, sp=None):
                 except donghua.Bad: raise
                 except Exception: pass                       # 这一段自己出了意外：不拦（它只是多看一眼字面，出错不该把好卡扔掉）
             if note: c['删'] = note['删']; c['写法'] = note['改']
-            good.append(c)
+            return c
         except donghua.Bad as e:
             why = str(e); tie = [x for x in (note or {}).get('改', []) if x['法'] == '贴回原话']     # 贴回原话以后才不合格的：原因里得说它自己写的那几个字，不然它看不懂
             hit = next((x for x in tie if x.get('贴') and '「{}」'.format(x['贴']) in why), None) or next((x for x in tie if '「{}」'.format(x['原话']) in why), None)                 # 出毛病的正是贴回原话的那一栏
             if hit: why = '「{}」不是这几句字幕里原样连着的字；照原话该是「{}」，可是{}'.format(hit['写的'], hit['原话'], why)
             elif tie: why += '；另外，' + '、'.join('「{}」照原话该是「{}」'.format(x['写的'], x['原话']) for x in tie[:2])   # 出毛病的是别的栏：两件事分开说
-            held.append(dict(项=a, 原因=why, 道='把关'))
-        except Exception as e: held.append(dict(项=a, 原因=f'格式不对（{type(e).__name__}）', 道='把关'))
+            raise donghua.Bad(why)
+    for a in items:
+        try: good.append(one(a)); continue
+        except donghua.Bad as e: why = str(e)
+        except Exception as e: held.append(dict(项=a, 原因=f'格式不对（{type(e).__name__}）', 道='把关')); continue
+        a2, qlog = qizhi(a, T) if (QIZHI if qz is None else qz) else (None, None)      # 过不了的：照起止取一次字，再从头查一遍
+        if a2 is not None:
+            try: c = one(a2); c['取字'] = qlog; good.append(c); continue
+            except donghua.Bad as e2: why += '；照字幕取字以后还是不行：' + str(e2)
+            except Exception: pass
+        held.append(dict(项=a, 原因=why, 道='把关'))
     kind = lambda c: c.get('原类型') or c['类型']
     as_item = lambda c: {'类型': kind(c), '从': c['la'] + 1, '到': c['lb']}
     good.sort(key=lambda c: (c['la'], c['lb'])); keep = []

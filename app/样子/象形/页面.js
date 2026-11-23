@@ -308,7 +308,15 @@ function cardSteps(S) {
 // ───────── 这一段的排法 ─────────
 const TA = 0.12, TB = 0.26;
 // 没配上画面的那几句：只有底纹在滑（还有角上的小字和字幕）。屏上放什么还没设计，这是个空位
-function cardIdle(S) { const P = PAL[S.pal]; return (ctx, t) => ground(ctx, P, S.seed, t - S.a); }
+// 2026-11-22 总控令：空位不再空着。这句的要紧词（架子给的 big）放大摆在中间，这句一开口就从蒙版里滑上来，停顿时留着，下一句开口或说完 1.2 秒后滑下去
+function bigWord(ctx, P, t) {
+  const l = LINES.filter(l => l.big && t >= l.t0 - 0.12 && t < (l.be ?? l.t1 + 0.32)).pop(); if (!l) return;
+  const at = l.t0 - 0.12, end = l.be ?? l.t1 + 0.32, px = fit(ctx, l.big, 230, W - 2 * MX, 6), y = 860;
+  const p = Math.min(inv(at, at + 0.45, t), 1 - inv(end - 0.22, end, t));
+  ctx.fillStyle = P.fg; ctx.fillRect(W / 2 - 100, y - px - 40, 200 * E.oExp(inv(at, at + 0.4, t)) * (1 - inv(end - 0.22, end, t)), 16);      // 字上头一小截短杠，和标题卡一样
+  G.maskText(ctx, l.big, W / 2, y, big(px), P.fg, p, { align: 'center', ls: '6px' });
+}
+function cardIdle(S) { const P = PAL[S.pal]; return (ctx, t) => { ground(ctx, P, S.seed, t - S.a); bigWord(ctx, P, t); }; }
 function buildShots() {
   const out = [], src = DATA.shots; let k = DATA.k0;
   for (const st of src) if (st.kind === 'stack') {            // 每张单子：每一行是第几秒说到的；说完最后一行过一会儿并成一块（架子没给时刻就照这个规矩）

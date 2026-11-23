@@ -62,7 +62,7 @@ a.pro{color:var(--link);font-weight:bold;font-size:15px}
   </div>
   <div class="row hide" id="prow"><span class="lab">真人出镜</span><label><input type="checkbox" id="keep" checked> 真人精剪 · 保留原画面</label><span class="tip">胶片开场，重点词随原声出现；横拍时按人脸位置裁竖屏。</span></div>
   <div class="row hide" id="words"><label class="lab" for="focus">强调词</label><input id="focus" type="text" maxlength="50" placeholder="留空自动选词"><span class="tip">可填同一句里依次说到的 1–3 个词，用逗号隔开。</span></div>
-  <div class="row hide" id="cloudRow"><span class="lab trialLab">云端排画面（试用）</span><label><input type="checkbox" id="ai"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
+  <div class="row hide" id="cloudRow"><span class="lab trialLab">专业版（试用）</span><label><input type="checkbox" id="ai"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
   <div class="row hide" id="codeRow"><span class="lab">次数码</span><input type="text" id="code" maxlength="40" placeholder="买了专业版的，把次数码填这里" style="width:280px"><button class="sec" id="codeSave">保存</button><span class="tip" id="codeTip">没有次数码也能用：免费版全在你电脑上排画面。</span><a class="pro" href="/web/pro.html" target="_blank" id="proLink">了解专业版</a></div>
   <div id="ask" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk">知道了，用云端</button><button class="sec" id="askNo">不用云端</button></div></div>
   <p class="tip hide proNote"></p>
@@ -96,7 +96,7 @@ a.pro{color:var(--link);font-weight:bold;font-size:15px}
 
 <div class="card hide" id="edit">
   <h3 style="margin:0">修改字幕和画面</h3>
-  <p class="tip" id="editTip">每行一句。左边改错字（语音识别难免有同音错字）；右边是这句画面里会出现的词和图标：点 × 去掉，点词可以换成这句里的别的词。改完点“重新生成”，不用重新识别字幕。还没点重新生成的，划掉的点 ↺ 就回来，删掉的词把原词填回去就行。重新生成以后还想要回删掉的词，回到页面最上面把这条录音重新导入，从头再出：之前改的都要重改，画面也会重新排。</p>
+  <p class="tip" id="editTip">每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。</p>
   <p class="tip"><span class="who" id="who"></span> <span id="whoNote"></span></p>
   <p class="tip hide proNote"></p>
   <div class="row" id="titleRow"><span class="lab">封面大字</span><input type="text" id="t1" maxlength="12" placeholder="第一行"> <input type="text" id="t2" maxlength="12" placeholder="第二行"><span id="tkw"></span><span class="tip">片头和封面上的大字，每行最多 12 个字</span></div>
@@ -105,8 +105,8 @@ a.pro{color:var(--link);font-weight:bold;font-size:15px}
   <textarea id="lines" class="hide"></textarea>
   <div class="row hide" id="styles2"><span class="lab">画风</span><div class="stl" id="stl2"></div><span class="tip">两张封面一律是字卡的样子，换画风只换视频画面。</span></div>
   <div class="row" id="themes2"><span class="lab">录音配色</span><span id="sw2"></span></div>
-  <div class="row hide" id="cloudRow2"><span class="lab trialLab">云端排画面（试用）</span><label><input type="checkbox" id="ai2"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
-  <div class="row hide" id="lookRow2"><span class="lab">画面样子</span><span id="lk2" style="display:flex;gap:14px;flex-wrap:wrap"><span class="sw on" data-k="全息">全息</span><span class="sw" data-k="象形">象形图形</span></span><span class="tip">换个样子再出一遍，不扣条数。</span></div>
+  <div class="row hide" id="cloudRow2"><span class="lab trialLab">专业版（试用）</span><label><input type="checkbox" id="ai2"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
+  <div class="row hide" id="lookRow2"><span class="lab">画面样子</span><span id="lk2" style="display:flex;gap:14px;flex-wrap:wrap"><span class="sw on" data-k="全息">全息</span><span class="sw" data-k="象形">象形图形</span></span><span class="tip">开了上面的云端才有这两种样子。换样子再出一遍，不另扣条数。</span></div>
   <div id="ask2" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk2">知道了，用云端</button><button class="sec" id="askNo2">不用云端</button></div></div>
   <div class="row hide" id="prow2" hidden><span class="lab">真人出镜</span><label><input type="checkbox" id="keep2" checked> 真人精剪 · 保留原画面</label></div>
   <div class="row hide" id="words2"><label class="lab" for="focus2">强调词</label><input id="focus2" type="text" maxlength="50" placeholder="留空自动选词"></div>
@@ -135,43 +135,43 @@ $('#sw2').innerHTML = $('#pick .row .sw').parentElement.innerHTML.replace('<span
 let theme2 = '夜幕';
 document.querySelectorAll('#sw2 .sw').forEach(e => e.onclick = () => { document.querySelectorAll('#sw2 .sw').forEach(x => x.classList.remove('on')); e.classList.add('on'); theme2 = e.dataset.t; });
 let STYLES = [], style = '字卡', style2 = '字卡';
-let look2 = '全息';   // 专业版的画面样子（11-16）：全息 / 象形图形；11-16 夜默认改成全息
+let look2 = '全息';
 const setLook = k => { look2 = k === '象形' ? '象形' : '全息'; document.querySelectorAll('#lk2 .sw').forEach(x => x.classList.toggle('on', x.dataset.k === look2)); };
 document.querySelectorAll('#lk2 .sw').forEach(e => e.onclick = () => setLook(e.dataset.k));
-let MODEL = '', JOB_MODEL = '';   // MODEL：中转现在报的模型名（首页提示、开关用）；JOB_MODEL：排这一条时中转报的
+let MODEL = '', JOB_MODEL = '';
 const WHO = { '规则': '这条的画面是在你电脑上排的。', get AI() { return `这条的画面是把字幕文字和每句开始的秒数发到云端，让${JOB_MODEL || MODEL || '云端模型'}排的，另外带了记数用的设备号、次数码、录音记号和软件版本号。录音和视频没有上传。`; } };
 let CLOUD = false;
-function cnDay(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof s === 'string' ? s : ''); return m ? `${m[1]} 年 ${+m[2]} 月 ${+m[3]} 日` : ''; }   // 不是日期就不写（11-09 复审：中转回什么都不原样往页面上写）
-const nn = v => Number.isInteger(v) && v >= 0 && v <= 1e6 ? v : null;   // 中转报的数：整数才写
-function drawTrial(t) {   // 云端还剩几条（中转报的）：填了次数码的看码，没填的看试用；用完、到期出一行带「了解专业版」
+function cnDay(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof s === 'string' ? s : ''); return m ? `${m[1]} 年 ${+m[2]} 月 ${+m[3]} 日` : ''; }
+const nn = v => Number.isInteger(v) && v >= 0 && v <= 1e6 ? v : null;
+function drawTrial(t) {
   t = t && typeof t === 'object' ? t : {}; const c = t['码'] && typeof t['码'] === 'object' ? t['码'] : null, left = nn(t['剩']); let lab, note = '';
   if (c) {
     const st = c['状态'], sh = nn(c['剩']), gong = nn(c['共']), tian = nn(c['天']), dao = cnDay(c['到期']);
-    lab = st === '能用' ? (sh == null ? '云端排画面（次数码能用）' : c['开始'] && dao ? `云端还剩 ${sh} 条，到 ${dao}` : `云端还剩 ${sh} 条，从第一次用起${!tian || tian === 365 ? '一年' : ` ${tian} 天`}内有效`)
+    lab = st === '能用' ? (sh == null ? '专业版（次数码能用）' : c['开始'] && dao ? `专业版：云端还剩 ${sh} 条，到 ${dao}` : `专业版：云端还剩 ${sh} 条，从第一次用起${!tian || tian === 365 ? '一年' : ` ${tian} 天`}内有效`)
       : st === '用完' ? `次数码的${gong == null ? '' : ` ${gong} `}条用完了` : st === '到期' ? (dao ? `次数码已经到期（到 ${dao}为止）` : '次数码已经到期')
-      : st === '不对' ? '次数码不对，请检查有没有填错' : '云端排画面（次数码填了，还没核对上）';
+      : st === '不对' ? '次数码不对，请检查有没有填错' : '专业版（次数码填了，还没核对上）';
     if (st === '用完' || st === '到期') note = `${lab}。以后画面在你电脑上排，照样出片。`;
     if (st === '不对') note = '次数码不对，请检查有没有填错。填对之前，画面在你电脑上排，照样出片。';
   } else {
-    lab = t['不限'] ? '云端排画面（这台电脑不限）' : left == null ? '云端排画面（试用）' : left > 0 ? `云端排画面（试用，还剩 ${left} 条）` : '云端排画面（免费试用已用完）';
+    lab = t['不限'] ? '专业版（这台电脑不限）' : left == null ? '专业版（试用）' : left > 0 ? `专业版（试用，还剩 ${left} 条）` : '专业版（免费试用已用完）';
     if (left === 0 && !t['不限']) note = `免费试用的${nn(t['共']) == null ? '' : ` ${t['共']} `}条用完了。以后画面在你电脑上排，照样出片。`;
   }
   if (nn(t['共']) != null && !c) document.querySelectorAll('.trialN').forEach(x => x.textContent = t['共']);
   document.querySelectorAll('.trialLab').forEach(x => x.textContent = lab);
   document.querySelectorAll('.proNote').forEach(x => { x.classList.toggle('hide', !CLOUD || !note);
-    x.textContent = note;                                    // 只当字写（11-09 复审中 9：原来 innerHTML 拼，回话里塞代码能在页面里跑）
+    x.textContent = note;
     if (note && !(c && c['状态'] === '不对')) { const a = document.createElement('a'); a.href = '/web/pro.html'; a.target = '_blank'; a.textContent = '了解专业版'; x.appendChild(a); } });
 }
-let FIRST_ASK = false;   // 还没点过「知道了，用云端」：勾上只出同意说明，开关先不勾上、什么都不发（11-09 盲审：说明出了却拦不住发送）
-const keepAi = (v, agree) => fetch('/api/pref', { method: 'POST', body: JSON.stringify(agree ? { '云端排画面': v, '云端已同意': true } : { '云端排画面': v }) }).catch(() => {});   // 软件记住，换端口也不忘
+let FIRST_ASK = false;
+const keepAi = (v, agree) => fetch('/api/pref', { method: 'POST', body: JSON.stringify(agree ? { '云端排画面': v, '云端已同意': true } : { '云端排画面': v }) }).catch(() => {});
 function drawStyles(box, cur, pick) {
   box.innerHTML = STYLES.map(x => `<div class="st${x.name === cur ? ' on' : ''}" data-n="${x.name}"><img src="/style/${encodeURIComponent(x.name)}/预览.jpg" alt=""><b>${x.name}</b><span>${x.line}</span></div>`).join('');
   box.querySelectorAll('.st').forEach(e => e.onclick = () => { box.querySelectorAll('.st').forEach(y => y.classList.remove('on')); e.classList.add('on'); pick(e.dataset.n); });
 }
 const hasPalette = n => (STYLES.find(x => x.name === n) || {}).palette;
 fetch('/api/styles').then(r => r.json()).then(j => { STYLES = j; drawStyles($('#stl'), style, n => { style = n; updateMode(); }); updateMode(); });
-setInterval(() => fetch('/api/ping').catch(() => {}), 5000); fetch('/api/ping').catch(() => {});  // 告诉后台窗口还开着
-$('#quit').onclick = async () => {   // 11-20：不开黑框以后，从这里退出；正在出片先问一句
+setInterval(() => fetch('/api/ping').catch(() => {}), 5000); fetch('/api/ping').catch(() => {});
+$('#quit').onclick = async () => {
   try {
     let r = await fetch('/api/quit', { method: 'POST' });
     if (r.status === 409) { if (!confirm('正在出片，现在关掉，这一条就白做了。\n真要关掉吗？')) return; r = await fetch('/api/quit?force=1', { method: 'POST' }); }
@@ -180,33 +180,33 @@ $('#quit').onclick = async () => {   // 11-20：不开黑框以后，从这里�
   const last = setInterval(() => {}, 1e9); for (let k = 0; k <= last; k++) clearInterval(k);
   document.body.innerHTML = '<div class="bye">口播成片已经关掉了，这个网页可以关了。<br>下次要用，再双击「剪一条」。</div>';
 };
-fetch('/api/ver').then(r => r.json()).then(j => { if (typeof j.v === 'string' && j.v) $('#ver').textContent = '版本 ' + j.v + ' · '; }).catch(() => {});   // 11-10：版本号读本机，不联网
+fetch('/api/ver').then(r => r.json()).then(j => { if (typeof j.v === 'string' && j.v) $('#ver').textContent = '版本 ' + j.v + ' · '; }).catch(() => {});
 fetch('/api/info').then(r => r.json()).then(j => {
   CLOUD = !!j.cloud; $('#cloudRow').classList.toggle('hide', !CLOUD);
-  MODEL = j.model || ''; document.querySelectorAll('.mdl').forEach(x => x.textContent = MODEL || '云端模型');   // 公示所用模型
-  const bn = typeof j.beian === 'string' ? j.beian.trim() : '';      // 算法备案号从中转或 设置.json 来（11-09 第三轮 E），没有就不写这半句
+  MODEL = j.model || ''; document.querySelectorAll('.mdl').forEach(x => x.textContent = MODEL || '云端模型');
+  const bn = typeof j.beian === 'string' ? j.beian.trim() : '';
   document.querySelectorAll('.beian').forEach(x => x.textContent = bn); document.querySelectorAll('.beianPart').forEach(x => x.hidden = !bn);
-  $('#ai').checked = j.ai === true;   // 11-09：免费版全在本机跑，开关默认关；勾上才把字幕文字发出去
-  FIRST_ASK = j.agreed !== true;     // 没点过「知道了」：勾上时先说清楚文字会发出去
+  $('#ai').checked = j.ai === true;
+  FIRST_ASK = j.agreed !== true;
   $('#codeRow').classList.toggle('hide', !CLOUD); if (j.code) $('#code').value = j.code;
   drawTrial(j.trial);
-  if (!JOB) { JOB = new URLSearchParams(location.search).get('job') || j.running; if (JOB) watch(); } });   // 点了哪条就看哪条；没点才接上正在出的  // 关了窗口又打开：接上正在生成的那条
-const askLeft = () => setTimeout(() => fetch('/api/info').then(r => r.json()).then(j => drawTrial(j.trial)).catch(() => {}), 300);   // 开了才问中转还剩几条
+  if (!JOB) { JOB = new URLSearchParams(location.search).get('job') || j.running; if (JOB) watch(); } });
+const askLeft = () => setTimeout(() => fetch('/api/info').then(r => r.json()).then(j => drawTrial(j.trial)).catch(() => {}), 300);
 $('#askOk').onclick = async () => { await keepAi(true, true); FIRST_ASK = false; $('#ai').checked = true; $('#ask').classList.add('hide'); askLeft(); codeTipAfter(); };
-const codeTipAfter = () => {   // 11-20 界面：填码时那句「点了以后才去核对」，点完「知道了」换成核对的结果，不留旧话
+const codeTipAfter = () => {
   if (!$('#code').value || !/以后才去核对/.test($('#codeTip').textContent)) return;
   $('#codeTip').textContent = '正在核对……';
   setTimeout(() => fetch('/api/info').then(r => r.json()).then(j => { const st = (((j.trial || {})['码']) || {})['状态'];
     $('#codeTip').textContent = st === '能用' ? '核对上了，可以用了。' : st === '不对' ? '这个码核对不上，请检查有没有填错。' : st ? '存好了。' : '存好了，云端暂时没连上，连上后自动核对。'; }).catch(() => { $('#codeTip').textContent = '存好了。'; }), 600);
 };
-let FOLLOW = false;   // 11-20 界面：点了「开始生成」「重新生成」，页面跟着滚到进度那一块，做完再滚到成片；重开网页接上的不滚
+let FOLLOW = false;
 $('#askNo').onclick = () => { keepAi(false); $('#ai').checked = false; $('#ask').classList.add('hide'); };
 $('#ai').onchange = () => {
-  if ($('#ai').checked && FIRST_ASK) { $('#ai').checked = false; $('#ask').classList.remove('hide'); return; }   // 没点过「知道了」：只出说明，开关不勾、不记、不发
+  if ($('#ai').checked && FIRST_ASK) { $('#ai').checked = false; $('#ask').classList.remove('hide'); return; }
   keepAi($('#ai').checked); $('#ask').classList.add('hide');
   if ($('#ai').checked) askLeft();
 };
-$('#codeSave').onclick = async () => {   // 填次数码：存在本机，马上问中转还剩几条
+$('#codeSave').onclick = async () => {
   $('#codeTip').textContent = '正在核对……';
   try {
     const r = await fetch('/api/code', { method: 'POST', body: JSON.stringify({ '码': $('#code').value }) }); const j = await r.json();
@@ -219,11 +219,11 @@ $('#codeSave').onclick = async () => {   // 填次数码：存在本机，马上
     drawTrial(j.trial);
   } catch (e) { $('#codeTip').textContent = '没存上，再试一次'; }
 };
-$('#ai2').onchange = () => {                                        // 修改页的开关：没点过「知道了」一样只出说明，开关不勾、不记
+$('#ai2').onchange = () => {
   if ($('#ai2').checked && FIRST_ASK) { $('#ai2').checked = false; $('#ask2').classList.remove('hide'); return; }
   keepAi($('#ai2').checked); $('#ai').checked = $('#ai2').checked; $('#ask2').classList.add('hide');
 };
-$('#askOk2').onclick = async () => { await keepAi(true, true); FIRST_ASK = false; $('#ai2').checked = $('#ai').checked = true; $('#ask2').classList.add('hide'); askLeft(); };   // 修改页点了也马上问剩几条（11-09 复审轻 9）
+$('#askOk2').onclick = async () => { await keepAi(true, true); FIRST_ASK = false; $('#ai2').checked = $('#ai').checked = true; $('#ask2').classList.add('hide'); askLeft(); };
 $('#askNo2').onclick = () => { keepAi(false); $('#ai2').checked = $('#ai').checked = false; $('#ask2').classList.add('hide'); };
 const drop = $('#drop');
 drop.onclick = () => $('#file').click();
@@ -297,7 +297,7 @@ function show(s, proof) {
   $('#prow2').classList.add('hide'); $('#keep2').checked = !!s.person;
   $('#titleRow').classList.toggle('hide', !!s.person); $('#themes2').classList.toggle('hide', !!s.person || (STYLES.length > 0 && !hasPalette(style2))); $('#words2').classList.toggle('hide', !s.person); $('#focus2').value=s.focus || '';
   $('#crow').classList.toggle('hide', !s.person); $('#ct').value = s.cover_t != null ? s.cover_t : '';
-  lastMine = !!s.my_music;  // 上次怎么配的乐，这次默认照旧
+  lastMine = !!s.my_music;
   document.querySelector(`input[name=m][value=${s.my_music ? 'mine' : s.music === false ? 'off' : 'on'}]`).checked = true;
   $('#edit').querySelector('h3').textContent = PROOF ? '先看一眼字幕有没有错字' : '修改字幕和画面'; $('#redo').textContent = PROOF ? '开始出片' : '重新生成'; $('#redoTip').textContent = '';
   if (PROOF) {   /* 还没出片：只让改字。字是电脑听出来的，云端照改好的字配画面 */
@@ -306,7 +306,6 @@ function show(s, proof) {
   } else if (FOLLOW) $('#done').scrollIntoView({ block: 'start', behavior: 'smooth' });
   FOLLOW = false;
 }
-// 每句一行：左边字幕（可改错字），右边上屏词和图标（可删可换）
 let ROWS = [];
 const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const svg = n => (window.ICONS || {})[n] ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]}</svg>` : '';
@@ -318,13 +317,13 @@ function drawRows(s) {
     return x ? { word0: w, word: w, kw0: k, kw: k, l0: t.replace(/\s+/g, ''), tn: (x.textn || '').replace(/\s+/g, ''), icon: x.icon, iconCn: x.icon_cn || '', iconWord: x.icon_word, iconOn: true,
     regs: (x.regs || x.more || []).map(m => ({ ...m, on: true })), say: '' } : null; });
   $('#editTip').textContent = PERSON ? '每行一句，改错字（语音识别难免有同音错字）。改完点“重新生成”，不用重新识别字幕。'
-    : '每行一句。左边改错字（语音识别难免有同音错字）；右边是这句画面里会出现的词和图标：点 × 去掉，点词可以换成这句里的别的词。改完点“重新生成”，不用重新识别字幕。还没点重新生成的，划掉的点 ↺ 就回来，删掉的词把原词填回去就行。重新生成以后还想要回删掉的词，回到页面最上面把这条录音重新导入，从头再出：之前改的都要重改，画面也会重新排。';
+    : '每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。';
   $('#rows').innerHTML = L.map((t, i) => `<div class="ln" data-i="${i}"><span class="no">${i + 1}</span><input type="text" value="${esc(t)}"><span class="chips"></span><span class="say hide"></span></div>`).join('');
   ROWS.forEach((_, i) => drawChips(i));
 }
-let LOOK_USED = null;   // 上一条片子是用哪套样子画的（象形 / 全息）；没换样子的是空的
-let PERSON = false, DRAWN_STYLE = '字卡', TITLE_KW = '', TITLE_MARK = true, COVER = null;   // COVER：封面上的大图标 {icon, cn, on}
-function drawTkw() {   // 大字里自动标成金色的那个词、封面上的大图标：点 × 去掉，点 ↺ 恢复
+let LOOK_USED = null;
+let PERSON = false, DRAWN_STYLE = '字卡', TITLE_KW = '', TITLE_MARK = true, COVER = null;
+function drawTkw() {
   const b = $('#tkw'); let h = '';
   if (TITLE_KW) h += `<span class="chip${TITLE_MARK ? '' : ' off'}" title="大字里标成金色的词"><span class="k">金色</span>${esc(TITLE_KW)}<button class="tk" title="${TITLE_MARK ? '不标金色' : '恢复金色'}">${TITLE_MARK ? '×' : '↺'}</button></span>`;
   if (COVER) h += `<span class="chip ic${COVER.on ? '' : ' off'}" title="封面上的大图标">${svg(COVER.icon)}<span class="cn">封面的${esc(COVER.cn)}</span><button class="cv" title="${COVER.on ? '封面不画这个图标' : '恢复'}">${COVER.on ? '×' : '↺'}</button></span>`;
@@ -338,22 +337,22 @@ const styleNote = () => {
   if (!STYLES.some(x => x.name === DRAWN_STYLE)) $('#styleNote').textContent = '这条片子是用以前的画面样子出的。这一版只剩字卡，重新生成会改用字卡。右边列的还是上一条片子画的东西；改成字卡可能会画出别的，出完片回这里再看一遍。';   /* 11-12：旧画风首页不列了，用户没地方「换」，照实说 */
   if (!PERSON && LOOK_USED) { $('#editTip').textContent = '每行一句。左边改错字（语音识别难免有同音错字）。右边列的是这条片子里按意思配的画面：点 × 去掉那一张，那几句就只出字幕。画面里的字是你说的原话，这里改不了。改完点“重新生成”，不用重新识别字幕。还没点重新生成的，划掉的点 ↺ 就回来。'; return; }
   if (!PERSON) $('#editTip').textContent = DRAWN_STYLE === '字卡'
-    ? '每行一句。左边改错字（语音识别难免有同音错字）。字卡的大字就是你说的原话，这里改不了；右边能删的是标亮的词、数字、年份和图标，点标亮的词可以换成这句里的别的词。改完点“重新生成”，不用重新识别字幕。删完重出，空出来的地方可能补画别的，出完片回这里再看一遍。还没点重新生成的，划掉的点 ↺ 就回来，删掉的词把原词填回去就行。重新生成以后还想要回删掉的词，回到页面最上面把这条录音重新导入，从头再出：之前改的都要重改，画面也会重新排。'
-    : '每行一句。左边改错字（语音识别难免有同音错字）；右边是这句画面里画出来的词和图标，字幕里标金色的词也在这里：点 × 去掉，点词可以换成这句里的别的词。改完点“重新生成”，不用重新识别字幕。删完重出，空出来的地方可能补画别的，出完片回这里再看一遍。还没点重新生成的，划掉的点 ↺ 就回来，删掉的词把原词填回去就行。重新生成以后还想要回删掉的词，回到页面最上面把这条录音重新导入，从头再出：之前改的都要重改，画面也会重新排。';
+    ? '每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。'
+    : '每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。';
 };
-const inLine = (R, line, v) => line.includes(v) || (!!R.tn && line === R.l0 && R.tn.includes(v));   // 填「80%」，字幕里说的是「八成」也算：软件按画面上的写法找回原话
+const inLine = (R, line, v) => line.includes(v) || (!!R.tn && line === R.l0 && R.tn.includes(v));
 function drawChips(i) {
   const R = ROWS[i], row = document.querySelector(`.ln[data-i="${i}"]`), box = row.querySelector('.chips'), say = row.querySelector('.say');
   say.textContent = R ? R.say : ''; say.className = 'say' + (R && R.say ? (R.note ? ' note' : '') : ' hide');
-  if (!R || PERSON) { box.innerHTML = ''; return; }                  // 老版本出的片没记这些；真人版画面不用这些词
-  const card = DRAWN_STYLE === '字卡', key = card ? 'kw' : 'word', cur = R[key];   // 列的是上一条片子画的：按那条片子的画风列，换了画风也不变
+  if (!R || PERSON) { box.innerHTML = ''; return; }
+  const card = DRAWN_STYLE === '字卡', key = card ? 'kw' : 'word', cur = R[key];
   let h = '';
   if (cur) h += `<span class="chip" title="点词可以换成这句里的别的词">${card ? '<span class="k">标亮</span>' : ''}<span class="w">${esc(cur)}</span><button class="del" title="去掉这个词">×</button></span>`;
-  else if (!LOOK_USED) h += `<button class="addw">＋ 加一个词</button>`;   // 象形、全息这两种样子不标亮单个词，加了也画不出来，不给加
-  const iconGone = (!card && R.iconWord && R.iconWord === R.word0 && R.word !== R.word0)   // 删了或换了它挂的词，图标也跟着走：显示成划掉
-    || (card && R.icon === 'calendar' && R.regs.some(m => m.kind === '年份' && !m.on));      // 字卡去掉年份大字，那张卡的日历也不画了
+  else if (!LOOK_USED) h += `<button class="addw">＋ 加一个词</button>`;
+  const iconGone = (!card && R.iconWord && R.iconWord === R.word0 && R.word !== R.word0)
+    || (card && R.icon === 'calendar' && R.regs.some(m => m.kind === '年份' && !m.on));
   if (R.icon) h += `<span class="chip ic${R.iconOn && !iconGone ? '' : ' off'}" title="图标">${svg(R.icon)}<span class="cn">${esc(R.iconCn || '图标')}</span><button class="ib" title="${R.iconOn ? '去掉图标' : '恢复图标'}">${R.iconOn ? '×' : '↺'}</button></span>`;
-  R.regs.forEach((m, j) => { if (m.text === cur || m.text === (card ? R.kw0 : R.word0)) return; h += `<span class="chip mo${m.on ? '' : ' off'}" title="${esc(m.kind)}"><span class="k">${esc(m.kind)}</span>${esc(m.text)}<button data-j="${j}" title="${m.on ? '去掉' : '恢复'}">${m.on ? '×' : '↺'}</button></span>`; });
+  R.regs.forEach((m, j) => { if (m.text === cur || m.text === (card ? R.kw0 : R.word0)) return; h += `<span class="chip mo${m.on ? '' : ' off'}" title="${esc(({'动画':'图形','模板':'图形'})[m.kind] || m.kind)}"><span class="k">${esc(({'动画':'图形','模板':'图形'})[m.kind] || m.kind)}</span>${esc(m.text)}<button data-j="${j}" title="${m.on ? '去掉' : '恢复'}">${m.on ? '×' : '↺'}</button></span>`; });
   box.innerHTML = h;
   const tell = (t, note) => { R.say = t; R.note = !!note; say.textContent = t; say.className = 'say' + (t ? (note ? ' note' : '') : ' hide'); };
   const w = box.querySelector('.w'), x = box.querySelector('.del'), add = box.querySelector('.addw'), ib = box.querySelector('.ib');
@@ -363,9 +362,9 @@ function drawChips(i) {
   const ask = () => {
     box.innerHTML = `<span class="chip"><input type="text" value="${esc(cur || '')}" placeholder="这句里的词"><button title="确定">✓</button></span>`;
     const inp = box.querySelector('input'), ok = () => {
-      const v = inp.value.replace(/\s+/g, ''), line = row.querySelector('input').value.replace(/\s+/g, '');   // 「fold two」这种带空格的英文：两边都去掉空格再比
+      const v = inp.value.replace(/\s+/g, ''), line = row.querySelector('input').value.replace(/\s+/g, '');
       if (v && !inLine(R, line, v)) { inp.style.borderColor = 'var(--acc)'; tell(`这句里没有「${v}」。要填这句字幕里有的字。`); return; }
-      R[key] = v || null; if (v && v === cur) R.again = key;   // 填的就是现在这个词：照样发过去，这句删掉的同一个字、同一个数（「80%」）会放回来
+      R[key] = v || null; if (v && v === cur) R.again = key;
       tell(!card && v && R.icon && R.iconWord && R.iconWord === R.word0 && v !== R.word0 ? '换了词，图标会跟着换成新词的（没有就不挂）' : '', true); drawChips(i);
     };
     box.querySelector('button').onclick = ok; inp.onkeydown = e => { if (e.key === 'Enter') ok(); }; inp.focus();
@@ -392,13 +391,13 @@ $('#redo').onclick = async () => {
   if (m === 'mine' && !f && !lastMine) { $('#redoTip').textContent = '请先选择本地音乐文件'; return; }
   if (m === 'mine' && f) {
     await fetch(`/api/bgm?id=${encodeURIComponent(JOB)}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f }); }
-  const open = document.querySelector('#rows .chips input');           // 填词框开着、还没点 ✓：先说一声，别数错行
+  const open = document.querySelector('#rows .chips input');
   if (open) { const i = +open.closest('.ln').dataset.i; open.closest('.ln').scrollIntoView({ block: 'center' }); open.focus();
     $('#redoTip').textContent = `第 ${i + 1} 行填的词还没点 ✓，点了再重新生成`; return; }
   const lines = [...document.querySelectorAll('#rows .ln > input')].map(x => x.value);
   if (lines.length !== originalLines || lines.some(x=>!x.trim())) { $('#redoTip').textContent='每行保留一句字幕，不能增删行或清空整行'; return; }
   const miss = PERSON ? -1 : ROWS.findIndex((R, i) => R && [R.word !== R.word0 && R.word, R.kw !== R.kw0 && R.kw].some(v => v && !inLine(R, lines[i].replace(/\s+/g, ''), v)));
-  if (miss >= 0) {                                                   // 先选了词、后把字幕改得不含这个词：说一声，别悄悄丢掉
+  if (miss >= 0) {
     const R = ROWS[miss]; R.say = `字幕改过以后，这句里没有「${R.word !== R.word0 ? R.word : R.kw}」了。换一个词，或者点 × 去掉。`; R.note = false; drawChips(miss);
     document.querySelector(`.ln[data-i="${miss}"]`).scrollIntoView({ block: 'center' });
     $('#redoTip').textContent = `第 ${miss + 1} 行选的词不在字幕里了，改好再点重新生成`; return;

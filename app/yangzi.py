@@ -45,8 +45,122 @@ def chip_of(s):
     return m['li'], f"{s.get('kind')}：{m.get('text') or ''}"
 
 
+# ───────── 台上的大字：没配上画面的句子，把这句里的一个名字、名词短语或数放大摆在台上 ─────────
+# 规矩（每一条都能拿出片后的大字清单逐个对）：
+#   一、只从这句字幕里原样取连着的字，不编字，不拼两句。
+#   二、这句本身是半句就不摆：句尾（去掉「呢、啊」这类语气字）是「的、得、就、是、在、用、去、本来、觉得、以后」这类接不完的字；
+#       句首是「的、得、了、着」这类接上一句的字；上一句是这样断开的，这一句是它的后半句：都不摆。
+#   三、只摆名字、名词短语、数。词里有动词、副词、介词、连词、代词、语气字的不摆；词尾是形容词、「里、上、头」这类方位字的不摆。
+#       开头的「叫、在、从、那、这、对、用、再说、根据」这类字先去掉再看。数前头的「大约、将近、超过」照留。
+#   四、名词短语要整：词后面紧跟着还是名词（「同一个AI」后面是「商业助手」），接上；接上超过 8 个字，从前头去掉「同一个」这类修饰；还不行就不摆。
+#   五、数和否定照上屏词那道关：不从一个数中间截，同一小句有「不、没」就得带上。
+#   六、台上连着摆大字最多三个，第四个空着，空过再数。中间有画面或空着的句子，从头数。
+#   挑不出来就空着。空一两秒不算毛病，乱挑才算。
+# 词先用云端给这句挑的上屏词，再用本机挑的词，最后看整句（8 个字以内）。切词用软件自带的 jieba，只查词性，不往它的词典里加词（免费版也用它切词）。
+# 一开口就出，说完留着，最多留到说完后 1.2 秒或下一句开口。
+BIG_MOST = 8
+BIG_HOLD = 1.2
+BIG_RUN = 3
+BIG_NO = re.compile(r'^(这个|那个|这些|那些|我们|你们|他们|什么|怎么|一个|就是|所以|但是|可是|因为|然后|其实|可能|已经|好像|如果|还是|或者|而且|以及|的话|时候|这样|那样|自己|大家|来说|一旦|看起来|起来|一期|一句|一下|这么|那么|这里|那里|这种|那种|有点|还有|知道|事儿|东西|今天|现在|一样|一点|一些|不是|没有|而是|结果|AI|ai)$')
+BIG_TAIL = '呢啊呀吧嘛哦哈啦么诶'
+BIG_HEAD = '的得地了着'                                         # 句首是这几个字，是接着上一句说的后半句
+BIG_HALF = re.compile(r'(的|得|地|就|是|把|被|让|给|在|从|和|跟|与|对|用|去|到|而|但|才|都|也|还|又|再|更|很|最|太|离|成|本来|原来|如果|因为|所以|但是|可是|而且|然后|觉得|认为|以后|之后|的话)$')
+BIG_LEAD = {'叫', '在', '从', '那', '这', '把', '被', '让', '给', '对', '用', '像', '按', '跟', '和', '与', '往', '而', '但', '就', '可', '再说', '根据', '还有'}
+BIG_NOUN = {'n', 'nr', 'nrt', 'nrfg', 'ns', 'nt', 'nz', 'ng', 'eng'}
+BIG_BAD = {'v', 'vd', 'vg', 'vn', 'vi', 'l', 'i', 'd', 'c', 'p', 'u', 'uj', 'ul', 'ud', 'uv', 'uz', 'ug', 'y', 'e', 'o', 'r', 'zg'}
+BIG_QUAL = {'大约', '约', '将近', '近', '超过', '不到', '差不多', '至少', '最多'}
+BIG_END_NO = '里上下中内外前后边头面时'
+BIG_FIX = {'拉平': 'v', '问': 'v', '过生日': 'v', '微软': 'nt', '发达': 'a', '清单': 'n', '有点': 'd', '多少': 'r', '人家': 'r', '专门': 'd'}      # jieba 词典里标错的词，只在这里改口
+
+
+def big_half(text):
+    """这句字幕是不是断在半中间（规矩二）。"""
+    t = str(text or '').strip().rstrip(BIG_TAIL)
+    return bool(BIG_HALF.search(t) or (t[:1] != '' and t[:1] in BIG_HEAD))
+
+
+def _toks(s):
+    import jieba.posseg as pg
+    out = []
+    for w, f in pg.cut(s, HMM=False):                           # 不让它猜生词（猜出来的词性最不准）
+        if w.isdigit(): f = 'm'
+        out.append((w, BIG_FIX.get(w, f)))
+    return out
+
+
+def _nouny(w):
+    """规矩三：名字、名词短语、数。"""
+    t = _toks(w)
+    if not t: return False
+    num = bool(re.search(r'\d', w))
+    if any(f in BIG_BAD and not (num and x in BIG_QUAL) for x, f in t): return False
+    if num: return True
+    return w[-1] not in BIG_END_NO and not t[-1][1].startswith('a')
+
+
+def _big_ok(w, text, nxt):
+    """和上屏词同一道关：不从一个数中间截、同一小句有「不、没」这类否定字就得带上它。查的时候出岔子就不摆。"""
+    try:
+        import xieshou
+        K = xieshou.DH_K
+        return bool(K['cut_ok'](w, text, nxt) and K['block_ok'](text, w))
+    except Exception: return False
+
+
+def _big_word(w, text, nxt):
+    """拿一个候选词照规矩三到五过一遍：过了回摆上台的词和它在这句里从第几个字起，过不了回 (None, None)。"""
+    w = w.strip() if isinstance(w, str) else ''
+    if not w or w not in text: return None, None
+    i = text.index(w)
+    while True:                                                    # 开头的「叫、在、从……」整词去掉
+        t = _toks(w)
+        if len(t) > 1 and t[0][0] in BIG_LEAD: w, i = w[len(t[0][0]):], i + len(t[0][0])
+        else: break
+    import jieba.posseg as pg
+    tab = pg.dt.word_tag_tab
+    for x, f in _toks(text[i + len(w):]):                          # 名词短语要整：后面紧跟着的词典里的名词接上
+        if f in BIG_NOUN and (x in tab or f == 'eng'): w += x
+        else: break
+    while len(w) > BIG_MOST:
+        t = _toks(w)
+        if len(t) > 1 and t[0][1] in ('a', 'b', 'm', 'q', 'r'): w, i = w[len(t[0][0]):], i + len(t[0][0])
+        else: break
+    if not (2 <= len(w) <= BIG_MOST) or BIG_NO.match(w) or not _nouny(w) or not _big_ok(w, text, nxt): return None, None
+    return w, i
+
+
+def big_of(l, nxt='', prev=''):
+    """这一句摆上台的那个词，和说到它的秒：回 (词, 秒) 或 (None, None)。nxt、prev 是下一句、上一句的字。"""
+    if l.get('person'): return None, None
+    text = str(l.get('text') or '')
+    if big_half(text) or big_half(prev): return None, None
+    try:
+        for c in (l.get('word'), l.get('kw'), text.strip().rstrip(BIG_TAIL)):
+            w, i = _big_word(c, text, nxt)
+            if not w: continue
+            p = 0
+            for g in l.get('cs') or []:                            # 一格可能不止一个字：数到第 i 个字落在哪一格
+                if p + len(g[0]) > i: return w, round(float(g[1]), 3)
+                p += len(g[0])
+            return w, round(float(l['t0']), 3)
+    except Exception: pass                                         # 切词出岔子就不摆
+    return None, None
+
+
+def _bare(x, pics):
+    """这句的大字在台上露得出来吗：说话那段（开口前 0.12 秒到收字）没被画面盖住的有 0.3 秒以上。"""
+    a, b, free = x['t0'] - 0.12, x['be'], 0.0
+    while a < b:
+        if not any(p['t0'] <= a < p['t1'] for p in pics): free += 0.05
+        a += 0.05
+    return free >= 0.3
+
+
 def content_of(jb):
     lines = [dict(i=l['i'], text=l['text'], t0=l['t0'], t1=l['t1'], cs=l['cs']) for l in jb['lines']]
+    for k, (x, l) in enumerate(zip(lines, jb['lines'])):
+        w, at = big_of(l, str(jb['lines'][k + 1].get('text') or '') if k + 1 < len(jb['lines']) else '', str(jb['lines'][k - 1].get('text') or '') if k else '')
+        if w: x['big'], x['bt'] = w, at; x['be'] = round(min(float(l['t1']) + BIG_HOLD, float(lines[k + 1]['t0']) if k + 1 < len(lines) else 1e9), 3)
     hide = {l['i']: l.get('hide') or [] for l in jb['lines']}      # 修改页点掉的东西，记在那一句的 hide 单上
     pics = []
     for s in list(jb['scenes']) + local_pics(jb['lines']):
@@ -59,6 +173,14 @@ def content_of(jb):
     fp = _fp(lines, pics)                                          # 指纹照点掉以前的算：点掉一张，别的画面的进场、摆法不跟着重排
     pics = [p for p in pics if p['签'] and not _hidden(hide.get(p['签'][0], []), p['签'][1])]      # 修改页点掉的不画；登记不了的也不画（字卡那套也是这样）
     for k, p in enumerate(pics, 1): p['号'] = k
+    run = 0                                                        # 规矩六：台上连着摆的大字最多三个，第四个空着
+    for x in lines:
+        if x.get('big') and _bare(x, pics):
+            if run >= BIG_RUN:
+                for key in ('big', 'bt', 'be'): x.pop(key, None)
+                run = 0
+            else: run += 1
+        else: run = 0
     return dict(时长=jb['dur'], 指纹=fp, 话题=jb.get('topics') or [], 句子=lines, 画面=pics)
 
 

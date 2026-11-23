@@ -282,7 +282,15 @@ function sceneTitle(S) {
 
 // ───────── 这一段的排法（照第八份候选甲的真答卷：三张小画面的起止、图标、字都是通义填的；数那一样是照原话手加的，答卷里没配） ─────────
 // 没配上画面的那几句：只有底盘、光柱在转（还有角上的小读数和字幕）。屏上放什么还没设计，这是个空位
-function sceneIdle(S) { return t => { stage(t, camOf(t, { dist: 7.6, cy: 700 }), { beam: 0.55 }); }; }
+// 2026-11-22 总控令：空位不再空着。这句的要紧词（架子给的 big）放大摆在台上，这句一开口就一格一格锁定出来，停顿时留着，下一句开口或说完 1.2 秒后收
+function bigWord(t) {
+  const l = LINES.filter(l => l.big && t >= l.t0 - 0.12 && t < (l.be ?? l.t1 + 0.32)).pop(); if (!l) return;
+  const w = l.big, n = [...w].length, size = Math.min(190, Math.floor(860 / (n * 1.04))), cy = 760, end = l.be ?? l.t1 + 0.32;
+  const at = l.t0 - 0.12, k = P(t, at, at + 0.4), A = clamp((end - t) * 5);
+  const r = cells(w, k, Math.floor(t * 24), W / 2, cy + size * 0.36, size, { align: 'center', alpha: A, weight: 800 });
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = T.acc(0.9 * A * k); ctx.fillRect(W / 2 - r.w / 2, cy + size * 0.62, r.w * eo(k), 3); ctx.restore();
+}
+function sceneIdle(S) { return t => { stage(t, camOf(t, { dist: 7.6, cy: 700 }), { beam: 0.55 }); bigWord(t); }; }
 const SCENES = { icon: sceneIcon, stack: sceneStack, hero: sceneHero, title: sceneTitle, none: sceneIdle };      // 后面的脚本可以往里换画法（并图标的 场面.js 把 icon 换成自动立体那种），换完把 SHOTS 清掉
 let SHOTS = null;
 const shotsOf = () => SHOTS || (SHOTS = DATA.shots.map(s => ({ ...s, fn: SCENES[s.kind](s) })));
