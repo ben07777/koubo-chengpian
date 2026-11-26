@@ -33,7 +33,7 @@ def local_path(name):
     软件所在路径全是英文就原样给。带中文时（中文用户名的桌面、OneDrive 里的桌面），
     先给从当前文件夹算起的相对路径（models 文件夹下的那串，剪一条.cmd 先进到软件文件夹，所以这串全是英文）；
     当前文件夹不在软件夹里，再试 Windows 的短文件名；都不行就原样给。
-    11-12 盲审重1：不再往软件夹以外（ProgramData 等）复制模型。旧版复制过去的那份新版不用，可以整个删掉。"""
+    11-12 检查重1：不再往软件夹以外（ProgramData 等）复制模型。旧版复制过去的那份新版不用，可以整个删掉。"""
     src = ROOT / "models" / name
     if str(src).isascii():
         return str(src)

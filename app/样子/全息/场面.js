@@ -71,7 +71,7 @@ function sceneAdd(S) {
     stage(t, cam);
     const o = { hue: T.hue, spin: PZ.spin(lt), solid: (flat ? 0.12 : 0.22) * P(lt, IN_LEN, IN_LEN + 0.5), wave: { y: (lt * 0.55 % 1.6) * 1.2 - 0.1, w: 0.05 } };
     const r = E.fn(o, k, lt, m, cam); if (out > 0) o.scanDown = { y: m.ymax * (1 - eio(out)) };
-    if (S.early && o.scan && k < 1) holo.draw(ctx, m, r.cam, { hue: T.hue, spin: o.spin, gain: 0.3 * P(lt, 0.05, 0.4) });      // 总控 11-16：换屏落定后半秒内主体得在。扫描长出的，先给一只淡的整影，再一层层扫实
+    if (S.early && o.scan && k < 1) holo.draw(ctx, m, r.cam, { hue: T.hue, spin: o.spin, gain: 0.3 * P(lt, 0.05, 0.4) });      // 11-16：换屏落定后半秒内主体得在。扫描长出的，先给一只淡的整影，再一层层扫实
     const info = holo.draw(ctx, m, r.cam, o);
     if (r.plane != null) HOLO.drawScanPlane(ctx, cam, W, H, r.plane, { rot: t * 0.6, alpha: 1 - P(lt, IN_LEN - 0.15, IN_LEN) });
     if (flat) {                                           // 板子落定了，线条图标描上去；描完隔一会儿做它的小动作
@@ -84,7 +84,7 @@ function sceneAdd(S) {
     const x0 = W0.align === 'center' ? W0.x - ww / 2 : W0.align === 'right' ? W0.x - ww : W0.x, kw = P(t, tw, tw + 0.55);
     const from = W0.at === 'below' ? [W0.align === 'right' ? bb[2] - 40 : bb[0] + 40, bb[3] + 8] : [bb[2] - 60, bb[1] - 8];
     const to = W0.at === 'below' ? [x0 + (W0.align === 'right' ? ww - 30 : 30), y - size - 22] : [x0 + ww - 30, y + 44];
-    if (!S.word) return;                                   // 总控 11-17：补的图标词太长又取不出短词的，只画图标，不出字也不牵引线（底下字幕照出）
+    if (!S.word) return;                                   // 11-17：补的图标词太长又取不出短词的，只画图标，不出字也不牵引线（底下字幕照出）
     HUD.leader(ctx, T, from, [to[0], from[1] + (W0.at === 'below' ? 26 : -26)], to, P(t, tw - 0.25, tw + 0.2), { alpha: A, pulse: P(t, tw, tw + 0.8) < 1 ? P(t, tw, tw + 0.8) : 0 });
     cells(S.word, kw, frame, x0, y, size, { alpha: A, weight: 800, seed: S.E * 3 + S.P });
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = T.line(0.8 * A * kw); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y + 30); ctx.lineTo(x0 + ww * eo(kw), y + 30); ctx.stroke(); ctx.fillStyle = T.acc(0.95 * A * kw); ctx.fillRect(x0, y + 26, 46 * eo(kw), 8); ctx.restore();
@@ -322,7 +322,7 @@ if (typeof DATA !== 'undefined' && DATA.nIcon != null) {
       const { lt, frame, A } = base(S, t);
       L = L || sameSize(R.map(r => r.t), 100, (x, px, i) => lay(x, px, PW - 74, 2, RH - 80, R[i].br, 800));
       const pin = eo(P(lt, 0.02, 0.4)), yOf = i => TOP + i * RH + RH / 2;
-      const rp = i => i ? eio(P(t, ts[i] - 0.45, ts[i] - 0.05)) : pin;      // 总控 11-17 夜：还没说到的那步不先摆（空圈、空框、02 挂几秒像没加载出来），说到它才连着线长出来，照两块
+      const rp = i => i ? eio(P(t, ts[i] - 0.45, ts[i] - 0.05)) : pin;      // 11-17 夜：还没说到的那步不先摆（空圈、空框、02 挂几秒像没加载出来），说到它才连着线长出来，照两块
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = T.dim(0.5 * A); for (let i = 1; i < n; i++) if (rp(i) > 0) ctx.fillRect(CX - 1.5, yOf(i - 1), 3, RH * rp(i));      // 暗的轨
       ctx.shadowColor = T.acc(0.8 * A); ctx.shadowBlur = 12; ctx.fillStyle = T.acc(0.95 * A);
       for (let i = 1; i < n; i++) { const g = eio(P(t, ts[i] - 0.45, ts[i] - 0.05)); if (g > 0) ctx.fillRect(CX - 2.5, yOf(i - 1), 5, RH * g); }      // 亮的线从上一步长到这一步

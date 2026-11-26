@@ -62,7 +62,7 @@ function zkScene(s) {
   if (s.icon) {
     if ((LN[s.la] || {}).noicon) s = Object.assign({}, s, { icon: s.type === 'hook' || s.type === 'myth' ? '无' : null });   // 这两种空着会补默认图标，给个画不出来的名字
   }
-  if (s.items) { const dflt = null;   // 11-12 总控令：分项卡没配图标的项画序号（这一项自己的位置），不再补对勾；去掉图标的项也画序号
+  if (s.items) { const dflt = null;   // 11-12 改：分项卡没配图标的项画序号（这一项自己的位置），不再补对勾；去掉图标的项也画序号
     s = Object.assign({}, s, { items: s.items.map(it => {     // 清单、分项里每条的小图标：登记在那条的句子下，去掉图标就不画
       const ic = it.icon || dflt; if (!ic) return it;
       let li = LN.findIndex(l => l.t0 === it.t); if (li < 0) li = lineOf(it.head || it.text || '', s.la);
@@ -141,7 +141,7 @@ const txtSize = (s, big = 84) => { const n = Math.max(...String(plain(s)).split(
 function kinLine(parent, li, size) {
   const l = LN[li], m = kwMask(l.cs, kwOf(li));
   const box = el('div', 'kin', null, parent, { fontSize: size + 'px', lineHeight: 1.16, top: '0px' });
-  const nb = Array.isArray(l.nb) ? l.nb : [];          // 11-10 复审第 4 条：一个数块（「3分之1」）的字包进一个不折行的格子，折行只在块外
+  const nb = Array.isArray(l.nb) ? l.nb : [];          // 11-10 检查第 4 条：一个数块（「3分之1」）的字包进一个不折行的格子，折行只在块外
   let grp = null, gEnd = -1;
   const ch = l.cs.map((c, i) => {
     if (i >= gEnd) { grp = null; const b = nb.find(b => b[0] === i && b[1] - b[0] > 1); if (b) { grp = el('span', null, null, box, { whiteSpace: 'nowrap' }); gEnd = b[1]; } }
@@ -152,7 +152,7 @@ function kinLine(parent, li, size) {
   });
   return { box, ch, t0: l.t0, t1: l.t1, h: 0 };
 }
-// 11-13 总控令（1.3.1）：句子里一串连着的数字（中间的小数点、后面紧跟的百分号算进去）整块一起出，出的时刻取这串第一个字原来该出的时刻，不比它早。
+// 11-13 改（1.3.1）：句子里一串连着的数字（中间的小数点、后面紧跟的百分号算进去）整块一起出，出的时刻取这串第一个字原来该出的时刻，不比它早。
 // 「负」「零下」「3到5」的「到」不并进来，两头的数各自一块。普通句卡、开场卡、模板里的句子都走 updChars（开场卡逐字出数是已知问题第 35 条，一起改）；
 // 数字卡、年份卡、区间卡的大数是另一套（numIn），不走这里。NUM_BLOCK 是考卷量牙时关的开关。
 const NUM_BLOCK = true;
@@ -232,7 +232,7 @@ function tplText(parent, li, a, b, size, color) {   // 这句 [a,b) 的字，逐
   return { box, ch };
 }
 const inR = (rs, i) => (rs || []).some(r => i >= r[0] && i < r[1]);
-// 禁止的圈和斜杠（11-12 夜盲审：斜杠两头伸到圈外、压住「孔」的右下角）：斜杠从圈心往左上、右下两头伸，伸到圈的里沿就停，
+// 禁止的圈和斜杠（11-12 夜检查：斜杠两头伸到圈外、压住「孔」的右下角）：斜杠从圈心往左上、右下两头伸，伸到圈的里沿就停，
 // 里沿 = 圈线的一半 6 + 斜杠圆头的一半 5，再让 5；圆角也算进去。斜杠粗 10（原 14；12 时量过「AA」右边那个字被盖住 22.5%，过了方案的两成）。
 function banMarks(parent, x, y, w, h, rx) {
   const svg = svgBox(parent, x, y, w, h);
@@ -390,8 +390,8 @@ const TPL = {
   },
 };
 // ---------- 模板第二批（11-12 小样）：注意·框住、时间·长条、增长·多出来的一截和拉开、举例·拎出来。接在第一批后面，同一套规矩 ----------
-// 时间·长条（模板一变化三）：一根横轨（第 120 到 860 像素，1.3.2 右头收 10；11-12 总控令左头往里收 10，镜头推近时不出线；粗 20，圆头），开口时 0.3 秒画出来，重点色从左头往右走，右头淡出不封口。
-// 1.3.2：起止照 planner（a0 卡上第一句开口，done 最晚关键词最后一个字开口），做完停住（11-12 夜总控：带图形的做完要停 0.8 秒；方案原来是走不完、到换卡还在挪，和这条撞了，照总控的）。
+// 时间·长条（模板一变化三）：一根横轨（第 120 到 860 像素，1.3.2 右头收 10；11-12 改左头往里收 10，镜头推近时不出线；粗 20，圆头），开口时 0.3 秒画出来，重点色从左头往右走，右头淡出不封口。
+// 1.3.2：起止照 planner（a0 卡上第一句开口，done 最晚关键词最后一个字开口），做完停住（11-12 夜：带图形的做完要停 0.8 秒；方案原来是走不完、到换卡还在挪，和这条撞了，照的）。
 // 一句的（没有数的久）：第 1 秒走到四成，之后越走越慢；两句合一张的（持续几年／十几年，planner 记了前一句的词 pkey）：说到前一句的词走到三成五，说到这句的词冲到九成。
 function timeBar(sc) {
   const tp = sc.tpl, li = tp.line, f0 = tp.first != null ? tp.first : li;
@@ -554,7 +554,7 @@ Object.assign(TPL, {
     };
   },
   // 举例·拎出来（模板六变化一）：整句先照常跳出来；说完后 0.1 秒，被举的词离开原位往下落 150、放大（字高不超过 150）、变重点色，0.4 秒；
-  // 留在上面的字缩到七成（11-12 总控令：六成时字高 22 不够 24）、变灰，原位留一个空；一根细竖线（粗 4，灰）把空位和下面的词连起来。只动字，照普通句卡排。
+  // 留在上面的字缩到七成（11-12 改：六成时字高 22 不够 24）、变灰，原位留一个空；一根细竖线（粗 4，灰）把空位和下面的词连起来。只动字，照普通句卡排。
   example(sc) {
     const tp = sc.tpl, li = tp.line, k = li - sc.la;
     if (tp.var !== 'lift' || k < 0 || li >= sc.lb) return null;
@@ -584,16 +584,16 @@ Object.assign(TPL, {
   },
 });
 
-// ---------- 普通句卡改法一（11-12 夜按总控令改主次）：所有普通句卡一个排法。第二步起默认开，OPTS.para12 === false 才走老的三种轮换 ----------
+// ---------- 普通句卡改法一（11-12 夜按改改主次）：所有普通句卡一个排法。第二步起默认开，OPTS.para12 === false 才走老的三种轮换 ----------
 // 字号：一张卡里统一，按这张卡最长的一排定。一排最多八个字（一句的卡七个），超了按排卡程序算的折点折行（planner.para_fold，按词折）。
-//   字号 = 720 ÷ 最长一排的字宽（一句的卡 640 ÷），上限 120、下限 90（11-12 夜总控改：原来下限 72，说过的缩到 360 宽只剩 19 像素高）。
+//   字号 = 720 ÷ 最长一排的字宽（一句的卡 640 ÷），上限 120、下限 90（11-12 夜改：原来下限 72，说过的缩到 360 宽只剩 19 像素高）。
 //   字宽：中文一个字算 1，字母数字算 0.62，和 planner._uw 一个算法。一张卡这样排装不下的，排卡程序已经拆成两张。
 // 正在说的那句：原大、字色、重点词用重点色。说过的：原地缩到八成（左上角不动），变灰，重点词颜色收掉。
-// 变灰和冒头同一刻（11-12 夜总控定）：下一句第一个字开始冒头的那一刻，上一句开始缩小变灰，0.3 秒做完；竖线也在这一刻往下长。屏上一直有一句是亮的。
+// 变灰和冒头同一刻（11-12 夜定）：下一句第一个字开始冒头的那一刻，上一句开始缩小变灰，0.3 秒做完；竖线也在这一刻往下长。屏上一直有一句是亮的。
 // 下一句排在上一句缩小后的正下方。整段位置按最后停住的样子先算好：镜头最多推近 1.03 倍，推近后上不过画面 580、下不过 1300、右不过 870。
 // 只装一句的卡：居中，按词折行，字号同样的上下限。
 // 有图标的卡：图标放到这段字下面的空处，淡淡的，不压字；放不下就不挂。
-// 整段的中心：画面 740（第一步交了 740 和 800 两个给总控挑，先用推荐的 740；OPTS.paraCY 可改）。
+// 整段的中心：画面 740（第一步做了 740 和 800 两个，先用 740；OPTS.paraCY 可改）。
 // 禁止、举例两种模板接在这个排法里（第二步）：这句说完变灰缩小时，圈、斜杠、拎出来的词跟着留在原地，一直留到这张卡结束。
 const P12 = PL.para12 !== false;
 const PARA_X = 136, PARA_W = 720, PARA_SHR = 0.8, PARA_TOP = 46, PARA_BOT = 744;
@@ -664,20 +664,20 @@ function sayPara(sc) {
     const li = tp.line, neg = tb.ch.slice(tp.neg[0], tp.neg[1]), obj = tb.ch.slice(tp.obj[0], tp.obj[1]), gap = Math.round(fs * 0.36);
     obj[0].e.style.marginLeft = gap + 'px'; obj[obj.length - 1].e.style.marginRight = gap + 'px';
     const tNeg = chT(li, tp.neg[0]), tO0 = chT(li, tp.obj[0]), tO1 = chEnd(li, tp.obj[1] - 1);
-    const tRing = tp.early ? tO0 + 0.3 : Math.max(tO0 + 0.3, Math.min(tO1, tO0 + 0.6)), tSl = tRing + 0.12;   // 11-12 夜盲审七处之三：停不够时提早（被圈的词一开口起笔，0.3 秒合上）；planner._text_done 同一算法
+    const tRing = tp.early ? tO0 + 0.3 : Math.max(tO0 + 0.3, Math.min(tO1, tO0 + 0.6)), tSl = tRing + 0.12;   // 11-12 夜检查七处之三：停不够时提早（被圈的词一开口起笔，0.3 秒合上）；planner._text_done 同一算法
     ban = { neg, obj, gap, tNeg, tO0, tRing, tSl, ring: null, slash: null };
-    tplDone(sc, tSl);   // 不再震：斜杠压完，大样子原样停住（盲审把震的那 0.35 秒读成还没画完）
+    tplDone(sc, tSl);   // 不再震：斜杠压完，大样子原样停住（检查把震的那 0.35 秒读成还没画完）
   }
   if (tp && tp.kind === 'example') {
     const key = tb.ch.slice(tp.key[0], tp.key[1]), rest = tb.ch.filter((_, i) => i < tp.key[0] || i >= tp.key[1]);
-    const tL = tp.early ? chT(tp.line, tp.key[0]) : LN[tp.line].t1 + 0.1, tL1 = tL + 0.4, DY = 150;   // 11-12 夜盲审七处之三：停不够时提早，被举的词一开口就往下拎；planner._text_done 同一算法
+    const tL = tp.early ? chT(tp.line, tp.key[0]) : LN[tp.line].t1 + 0.1, tL1 = tL + 0.4, DY = 150;   // 11-12 夜检查七处之三：停不够时提早，被举的词一开口就往下拎；planner._text_done 同一算法
     const thread = el('div', null, null, tb.box, { position: 'absolute', width: '4px', borderRadius: '2px', background: 'var(--sub)', opacity: 0 });
     thread.dataset.tplmark = 1; key.forEach(c => { c.e.dataset.tplmark = 1; });   // 量帧用：主动作是被举的词和细线
     lift = { key, rest, tL, tL1, DY, thread, g: null };
     tplDone(sc, tL1);
   }
   // 1.3.2 只动字的另三种。主动作做完的时刻和 planner._text_done 一个算法：被框、打勾的词一开口起笔，最快 0.3 秒、最慢 0.6 秒画完（说完就画完）；停不够时提早，0.3 秒画完。
-  // 注意（1.3.2 改法，11-12 盲审「框错了词」「整句变灰」）：框这句的重点词，别的字不变灰，只把框里的词提亮成框的颜色；提醒类框住（重点色），危险类四个角（坏色）。
+  // 注意（1.3.2 改法，11-12 检查「框错了词」「整句变灰」）：框这句的重点词，别的字不变灰，只把框里的词提亮成框的颜色；提醒类框住（重点色），危险类四个角（坏色）。
   //   四个角从外面 1.4 倍的地方收到词的四个角上，最后 0.25 秒，到位时越过一点再回来。缩小变灰时词和记号的颜色不褪。方案里的「镜头推近 1.06 倍」没做：新排法整段一起推近，单推一句会和上下几排错开。
   // 打勾：说到办成的那个词，词右边一笔打个勾（重点色）。对话框：说的那句话一开口，0.3 秒画好一个圆角框把整句框住，左上角一个小尾巴朝上指着说话的人那句。
   let mark = null;
@@ -706,7 +706,7 @@ function sayPara(sc) {
       bl.forEach(b => { b.box.style.fontSize = fs + 'px'; });
       if (ban) { ban.gap = Math.round(fs * 0.36); ban.obj[0].e.style.marginLeft = ban.gap + 'px'; ban.obj[ban.obj.length - 1].e.style.marginRight = ban.gap + 'px'; }
     }
-    // 11-12 夜盲审七处之四：停住时高装不下，先缩字，缩到 90 为止，还装不下才拆（拆在 planner；para_card 同一算法，拎出来那句按落下来的词算高）
+    // 11-12 夜检查七处之四：停住时高装不下，先缩字，缩到 90 为止，还装不下才拆（拆在 planner；para_card 同一算法，拎出来那句按落下来的词算高）
     const estH = () => { const hs = bl.map(b => b.box.offsetHeight); if (lift) { const h1 = fs * 1.16; hs[tk] = Math.max(hs[tk], h1 / 2 + 150 + h1 * Math.min(1.5, 150 / fs) / 2 + 6); } return hs.reduce((a, h, k) => a + (k < hs.length - 1 ? h * SHR + G : h), 0); };
     for (let n = 0; n < 40 && fs > PARA_MIN && estH() > BOT - TOP; n++) {
       fs -= 1; G = Math.round(fs * 0.3); bl.forEach(b => { b.box.style.fontSize = fs + 'px'; });
@@ -745,7 +745,7 @@ function sayPara(sc) {
     if (lift) {   // 拎下来的词算进这一句的高度：下一句排在它下面，不压上
       const S1 = Math.min(1.5, 150 / fs), r0 = lift.key[0].e, r1 = lift.key[lift.key.length - 1].e, a0 = tb.ch[0].e, a1 = tb.ch[tb.ch.length - 1].e;
       const kx = (r0.offsetLeft + r1.offsetLeft + r1.offsetWidth) / 2, cx = (a0.offsetLeft + a1.offsetLeft + a1.offsetWidth) / 2, h = r0.offsetHeight, ky = r0.offsetTop + h / 2;
-      const RS = Math.max(0.7, 72 / fs), ax = one ? cx : a0.offsetLeft;   // 11-12 夜盲审七处之三：剩下那排缩完不小于 72 号；多句的卡朝左边缩，和上下几排左边对齐（一句的卡朝中间）
+      const RS = Math.max(0.7, 72 / fs), ax = one ? cx : a0.offsetLeft;   // 11-12 夜检查七处之三：剩下那排缩完不小于 72 号；多句的卡朝左边缩，和上下几排左边对齐（一句的卡朝中间）
       lift.g = { S1, RS, ax, kx, cx, ky, h, gx: ax + (kx - ax) * RS, rest: lift.rest.map(c => c.e.offsetLeft + c.e.offsetWidth / 2), kc: lift.key.map(c => c.e.offsetLeft + c.e.offsetWidth / 2) };
       hs[tk] = Math.max(hs[tk], ky + lift.DY + h * S1 / 2 + 6);
     }
@@ -795,7 +795,7 @@ function sayPara(sc) {
       if (mark.kind === 'quote' && mark.path) dash(mark.path, P(t, mark.tO0, mark.tS, E.ioQ));
     }
     if (lift && lift.g) {   // 说完后 0.1 秒，被举的词往下落 150、放大、变重点色；别的字缩到七成、变灰；一根细竖线连着空位和落下来的词。缩上去以后照样留着
-      // 11-12 夜盲审七处之三：这句缩灰时，落下来的词缩回原大、剩下的字回到原样（缩灰以后「淘宝」不比正在说的那句大，剩下的字不小于 72 号）；提早做时字还在冒，冒的动作照算
+      // 11-12 夜检查七处之三：这句缩灰时，落下来的词缩回原大、剩下的字回到原样（缩灰以后「淘宝」不比正在说的那句大，剩下的字不小于 72 号）；提早做时字还在冒，冒的动作照算
       const kl = P(t, lift.tL, lift.tL1, E.outC);
       if (kl > 0) {
         const L = lift, g = L.g, gs = shr(tk, t), rs = 1 - (1 - g.RS) * kl * (1 - gs), S = 1 + (g.S1 - 1) * kl * (1 - gs), gx = g.ax + (g.kx - g.ax) * rs;
@@ -818,7 +818,7 @@ function sayPara(sc) {
   };
 }
 
-// 11-12 夜盲审七处之五：对比卡这张卡期间说的每一句都要在主区（画面 545–1345）出现过，字号不低于 72；盒子推近以后右边不过 870。
+// 11-12 夜检查七处之五：对比卡这张卡期间说的每一句都要在主区（画面 545–1345）出现过，字号不低于 72；盒子推近以后右边不过 870。
 // 排法：「以前」「现在」两个盒子上下摆；每边按句分块（planner.cmp_parts 分好、折好），一边不超过三排就一句句往下摞，摞不下就说到哪句换哪句。
 function cmpParts(sc) {
   const X = 100, W = 724, PX = 38, PY = 24, LAB = 62, GAP = 12, IW = W - 2 * PX, TOP = 24, ROOM = 752, MID = 96;
@@ -855,7 +855,7 @@ function cmpParts(sc) {
   };
 }
 
-// 11-12 夜盲审七处之一：数字卡、年份卡、区间卡不滚数，屏上只出现这句话里的数。数从 max(说到前 0.2 秒, 卡开始进来后 0.15 秒) 起淡入、0.2 秒淡满，
+// 11-12 夜检查七处之一：数字卡、年份卡、区间卡不滚数，屏上只出现这句话里的数。数从 max(说到前 0.2 秒, 卡开始进来后 0.15 秒) 起淡入、0.2 秒淡满，
 // 同时从 0.86 放大落定；这三种卡等上一张退干净再进（卡开始后 0.05 秒起，0.3 秒进满，见下面镜头那段的 sc.late）。planner.num_full 是同一算法，两边一起改
 const numIn = (t, T, t0) => { const a = Math.max(T - 0.2, t0 + 0.15); return { a, o: P(t, a, a + 0.2, E.outC), s: 0.86 + 0.14 * P(t, a, a + 0.45, E.outB) }; };
 
@@ -899,7 +899,7 @@ const BUILD = {
       ks.upd(t);
     };
   },
-  question(sc) {   // 11-12 夜总控：下面那句照一句的普通句卡排，一排最多七个字（居中最宽 640）、按排卡程序的折点折、字号 90 到 120；大问号往上让 60，句子顶在画面 945，离问号底一百来像素
+  question(sc) {   // 11-12 夜：下面那句照一句的普通句卡排，一排最多七个字（居中最宽 640）、按排卡程序的折点折、字号 90 到 120；大问号往上让 60，句子顶在画面 945，离问号底一百来像素
     const q = abs(el('div', 'big', '?', sc.el, { fontSize: '420px', lineHeight: 1, color: 'var(--acc)', width: '1080px', textAlign: 'center' }), 0, P12 ? -100 : -40);
     const ks = KinStack(sc, 590, 100, { w: SAFE_W });
     if (P12) {   // 软开头（「所以」这类）并进来的那句也一样排，整卡一个字号
@@ -1109,7 +1109,7 @@ const BUILD = {
     const ticks = [0, .25, .5, .75, 1].map(f => abs(el('div', null, fmtN(Math.round(max * f), sc.unit === '%' ? '' : ''), sc.el, { font: '600 42px Arial', color: 'var(--sub)', width: '120px', textAlign: 'center' }), X + BW * f - 60, Y + BH + 22));
     const mk = () => abs(el('div', 'num', '', sc.el, { fontSize: '118px', color: 'var(--acc)', whiteSpace: 'nowrap' }), 0, Y - 150);
     const mLo = mk(), mHi = mk(), wCache = new Map();
-    // 两头的数字各自多宽，得量出来：区间一窄，「60天」和「90天」会叠在一起（盲审 11-04：终值叠成「60夭90天」）
+    // 两头的数字各自多宽，得量出来：区间一窄，「60天」和「90天」会叠在一起（检查 11-04：终值叠成「60夭90天」）
     const put = (e, s2) => { e.textContent = s2; if (!wCache.has(s2)) wCache.set(s2, e.offsetWidth); return wCache.get(s2); };
     const xOf = v => X + 8 + (BW - 16) * clamp(v / max);
     // 11-09 第三轮抽帧：两头挨得近时落定读成「1.5 2.5倍」，像一个数。这时把字幕原文中间那个「到」照抄补在前半后面，读出来是「1.5到 2.5倍」
@@ -1119,12 +1119,12 @@ const BUILD = {
       if (tight === null && conn) { mLo.textContent = sc.rawLo + conn; mHi.textContent = sc.rawHi; const fl = mLo.offsetWidth, fh = mHi.offsetWidth; if (fl > 0 && fh > 0) tight = xOf(sc.hi) - xOf(sc.lo) < (fl + fh) / 2 + 30; }
       const k0 = P(t, sc.t0, sc.t0 + 0.4, E.outC); set(ttl, { o: k0, y: (1 - k0) * 30 }); set(bar, { o: k0 }); if (nub) nub.style.opacity = k0;
       ticks.forEach(e => e.style.opacity = k0 * 0.9);
-      // 条要比嘴快一点：句子一开头就往上涨，说到数字时已经到位（盲审：慢半拍、截到 71% 像出错）
+      // 条要比嘴快一点：句子一开头就往上涨，说到数字时已经到位（检查：慢半拍、截到 71% 像出错）
       const kl = P(t, sc.t0 + 0.25, Math.max(sc.tLo, sc.t0 + 0.6) + 0.1, E.outC), kh = P(t, sc.tLo + 0.05, Math.max(sc.tHi, sc.tLo + 0.4) + 0.1, E.outC);
       const lo = sc.lo * kl, hi = lerp(sc.lo, sc.hi, kh);
       const x1 = xOf(lo) - X - 8, x2 = xOf(Math.max(hi, lo)) - X - 8;
       band.style.left = (8 + (kl > 0 ? x1 : 0)) + 'px'; band.style.width = Math.max(kl > 0 ? 10 : 0, x2 - x1) + 'px'; band.style.opacity = kl > 0 ? 1 : 0;
-      const qL = numIn(t, sc.tLo, sc.t0), qH = numIn(t, sc.tHi, sc.t0);   // 11-12 夜盲审七处之一：两头的数一出来就是字幕原文，不滚；条照旧涨
+      const qL = numIn(t, sc.tLo, sc.t0), qH = numIn(t, sc.tHi, sc.t0);   // 11-12 夜检查七处之一：两头的数一出来就是字幕原文，不滚；条照旧涨
       const wl = put(mLo, rollNum(sc.lo, sc.rawLo, true) + rawUnit(sc.rawLo) + (tight && qH.o > 0 ? conn : '')), wh = put(mHi, rollNum(sc.hi, sc.rawHi, true) + rawUnit(sc.rawHi));
       let cl = xOf(sc.lo), ch = xOf(sc.hi), need = (wl + wh) / 2 + (tight ? 12 : 30);
       if (ch - cl < need) { const m = (cl + ch) / 2; cl = m - need / 2; ch = m + need / 2; }   // 挤到一起就对称撑开
@@ -1145,7 +1145,7 @@ const BUILD = {
       const nd = String(rawSplit(raw).n).length, ul = rawUnit(raw).length;
       // 11-09 第三轮抽帧：「3.85个百分点」单位折成「个百分 / 点」两行。单位不许折行；数加单位放不下 880 像素就整体缩小
       const nsz = Math.min(nd <= 2 ? 290 : nd === 3 ? 260 : nd === 4 ? 225 : 185, Math.floor(868 / (0.64 * nd + 0.5 * ul)));
-      const nm = el('div', 'num', rollNum(value, raw, true), row, { fontSize: nsz + 'px' });   // 11-12 夜盲审七处之一：一出来就是字幕原文的数，不滚
+      const nm = el('div', 'num', rollNum(value, raw, true), row, { fontSize: nsz + 'px' });   // 11-12 夜检查七处之一：一出来就是字幕原文的数，不滚
       g.un = el('div', 'big', rawUnit(raw), row, { fontSize: Math.round(nsz * 0.48) + 'px', lineHeight: 1, whiteSpace: 'nowrap' });   // 单位照抄字幕原文
       g.row = row;
       let barF = null;
@@ -1156,7 +1156,7 @@ const BUILD = {
     const G2 = sc.second ? grp(sc.second.label, sc.second.value, sc.second.unit, 40, sc.second.raw) : null;
     const warn = null;   // 11-12：警示牌不自动挂（「坏」是按少、贵、跌这些单字判的，跟半截撞上一个病）；数的颜色、震动照旧
     let warnOff = false;
-    if (warn) sc.measure.push(() => {                  // 11-10 复审第 7 条：「累计亏损1234.56万美元」三角压在「元」上。量一下，三角不许压数和单位
+    if (warn) sc.measure.push(() => {                  // 11-10 检查第 7 条：「累计亏损1234.56万美元」三角压在「元」上。量一下，三角不许压数和单位
       const g = G1.g, row = g.row, un = g.un, lb = g.lb, x0 = 90, y0 = 40;
       const keep = G1.nm.textContent; G1.nm.textContent = rollNum(G1.value, G1.raw, true) || keep;   // 11-10 第二次：按最后停住的数量宽度（排版时数还只显示「0」）
       const xr = x0 + un.offsetLeft + un.offsetWidth, rt = y0 + row.offsetTop, rh = row.offsetHeight;
@@ -1264,7 +1264,7 @@ function proText(parent, s, w, h, cap, color) {      // 一段字居中放进 w�
   return box;
 }
 const PRO = {
-  '亮出大数'(sc) {   // 一张纸落下来，说到那个数，数砸在纸上（11-14 整片盲审：底下三道灰线像半成品，拿掉，纸收矮）
+  '亮出大数'(sc) {   // 一张纸落下来，说到那个数，数砸在纸上（11-14 整片检查：底下三道灰线像半成品，拿掉，纸收矮）
     const N = sc.num, W = 740, H = sc.what ? 470 : 400, T = proAt(sc, N.t), ny = sc.what ? 126 : 56;
     const rule = proRule(sc), pp = proPaper(sc.el, PRO_CX - W / 2, sc.what ? 170 : 200, W, H);
     if (sc.what) {
@@ -1345,11 +1345,11 @@ const PRO = {
     };
   },
   '几个要点'(sc) {   // 一根线上挂几块牌子，说到哪条哪块落下来
-    if (sc.bubble || sc.pts.some(p => uW(p.text) > 4)) return PRO._slips(sc, sc.pts, false);   // 竖牌子只留给四个字以内的短词（11-14 整片盲审：六个字竖着念比横排慢）；长的、别人说的话，用横纸条
+    if (sc.bubble || sc.pts.some(p => uW(p.text) > 4)) return PRO._slips(sc, sc.pts, false);   // 竖牌子只留给四个字以内的短词（11-14 整片检查：六个字竖着念比横排慢）；长的、别人说的话，用横纸条
     const Pn = sc.pts, n = Pn.length, sp = n === 2 ? 300 : 770 / n, pw = n <= 3 ? 220 : 172, LY = 100, tail = PRO_TAIL['几个要点'];   // 两块牌子靠拢挂在中间
     const RUN = /[0-9A-Za-z.%]{1,5}/g, units = s => s.replace(RUN, 'x').length;   // 竖排：一串数字、字母横着并成一格
     const vert = s => s.replace(RUN, m => m.length > 1 ? `<span style="text-combine-upright:all;-webkit-text-combine:horizontal">${m}</span>` : m);
-    const fs = clampN(Math.floor(510 / Math.max(...Pn.map(p => units(p.text)))), 60, 120);   // 510：最长的牌子底边离字幕留出空（11-14 盲审：六个字的牌子快顶到字幕）
+    const fs = clampN(Math.floor(510 / Math.max(...Pn.map(p => units(p.text)))), 60, 120);   // 510：最长的牌子底边离字幕留出空（11-14 检查：六个字的牌子快顶到字幕）
     const win = abs(el('div', null, null, sc.el, { height: '760px', overflow: 'hidden' }), 0, LY + 3, 1080), rule = proRule(sc, LY);
     const G = Pn.map((p, i) => {
       const cx = PRO_CX + sp * (i - (n - 1) / 2), h = Math.round(units(p.text) * fs * 1.08 + 76);
@@ -1389,7 +1389,7 @@ const PRO = {
     const bub = !numbered && sc.bubble, n = S.length, gap = 30, H = Math.min(170, Math.floor((600 - gap * (n - 1)) / n)), ind = !numbered ? 0 : n === 2 ? 120 : n === 3 ? 84 : 58;
     const W = numbered ? 770 - ind * (n - 1) : bub ? 690 : 730, X0 = bub ? 128 : 100, HT = H * n + gap * (n - 1);
     const Y0 = (bub ? 96 : 120) + Math.round((600 - HT) / 2), tail = PRO_TAIL[sc.kind], tx0 = numbered ? H + 28 : 58, avail = W - tx0 - 28;
-    const two = s => uW(s.text) > 8;                                           // 长的折成两行，字才够大（11-14 整片盲审：长短语别竖排）
+    const two = s => uW(s.text) > 8;                                           // 长的折成两行，字才够大（11-14 整片检查：长短语别竖排）
     let fs = Math.min(Math.floor(H * 0.5), Math.floor(avail / Math.max(...S.map(s => two(s) ? Math.ceil(uW(s.text) / 2) : uW(s.text)))));
     if (S.some(two)) fs = Math.min(fs, Math.floor((H - 16) / 2.3));
     const rule = bub ? null : proRule(sc, 70);
@@ -1406,7 +1406,7 @@ const PRO = {
       const tb = el('div', null, null, pp, { position: 'absolute', left: tx0 + 'px', top: '0', width: avail + 'px', height: H + 'px', display: 'flex', alignItems: 'center' });
       el('div', 'big', s.text, tb, Object.assign({ fontSize: fs + 'px' }, two(s) ? { lineHeight: 1.14, wordBreak: 'break-all', textWrap: 'balance' } : { whiteSpace: 'nowrap', lineHeight: 1 }));
       const ar = numbered && i ? proArrow(sc.el, [[x - ind / 2, y - gap + 8], [x - ind / 2, y + H / 2], [x - 10, y + H / 2]], 8) : null;
-      return { pp, ar, T: i ? proAt(sc, s.t) : sc.t0 + 0.35, rot: numbered || bub ? 0 : (i % 2 ? 0.9 : -0.9) };   // 第一张跟着卡一起进来（整片盲审：卡进来了只有一根横线，空了一秒）
+      return { pp, ar, T: i ? proAt(sc, s.t) : sc.t0 + 0.35, rot: numbered || bub ? 0 : (i % 2 ? 0.9 : -0.9) };   // 第一张跟着卡一起进来（整片检查：卡进来了只有一根横线，空了一秒）
     });
     return t => {
       if (rule) rule.style.transform = `scaleX(${P(t, sc.t0 + 0.05, sc.t0 + 0.45, E.outC).toFixed(4)})`;
@@ -1532,7 +1532,7 @@ function build() {
     parts.forEach(p => { const isH = /^\[\[/.test(p); for (const c of plain(p)) { const s = el('span', isH ? 'hl' : null, c, row, { display: 'inline-block' }); tch.push(s); } });
   });
   const longest = Math.max(1, ...(PL.title || ['']).map(x => plain(x).length));
-  // 11-13 总控令（1.3.1）：标题带逐字飞进来（每字隔 0.018 秒），也照整块出数的规矩：一串连着的数字跟这串第一个字一起飞进来。tLead[i] = 第 i 个字跟着第几个字的时刻走
+  // 11-13 改（1.3.1）：标题带逐字飞进来（每字隔 0.018 秒），也照整块出数的规矩：一串连着的数字跟这串第一个字一起飞进来。tLead[i] = 第 i 个字跟着第几个字的时刻走
   const tLead = tch.map((_, i) => i);
   if (NUM_BLOCK) { const tc = tch.map(e => ({ e })); numLead(tc); tc.forEach((c, i) => { if (c.lead) tLead[i] = tc.indexOf(c.lead); }); }
   ttl.style.fontSize = Math.min(86, 930 / (longest * 0.92)) + 'px';
@@ -1557,9 +1557,9 @@ function build() {
     SCN.push(sc);
   }
   for (const sc of SCN) { sc.el.style.display = 'block'; sc.measure.forEach(f => f()); sc.el.style.display = 'none'; }
-  // 11-13 总控令（1.3.1）：换卡不许叠，所有卡种一个规矩。新卡的字、盒子、图形出现的第一帧，上一张必须已经看不见：
+  // 11-13 改（1.3.1）：换卡不许叠，所有卡种一个规矩。新卡的字、盒子、图形出现的第一帧，上一张必须已经看不见：
   // 上一张看不见的时刻（开场卡淡到 t1 前 0.08 秒就没了；别的卡 t1 后 0.05 秒）以后才开始露出来，至少 0.3 秒露满（sc.inA 到 sc.inB）。
-  // 11-13 总控定「甲」：卡怎么动（滑进、放大、上移）照 1.3 的老时间走，只把露出来推迟；不然动作被推迟，对比盒还在半路就亮了，右边过 870（饭局 93 秒）。
+  // 11-13 定「甲」：卡怎么动（滑进、放大、上移）照 1.3 的老时间走，只把露出来推迟；不然动作被推迟，对比盒还在半路就亮了，右边过 870（饭局 93 秒）。
   // 原来只有数字卡、年份卡、区间卡这么等（sc.late）；对比卡盒子里换句是盒子自己的事，不归这里（已知问题第 73 条）。CUT_CLEAN 是考卷量牙时关的开关。
   const CUT_CLEAN = true;
   SCN.forEach((sc, k) => {
@@ -1658,7 +1658,7 @@ function build() {
       sc.upd(t);
       if (!sc.noEnter || !sc.noExit) {
         const a = sc.noEnter ? 1 : sc.late ? P(t, sc.t0 + 0.05, sc.t0 + 0.35, E.outC) : P(t, sc.t0 - 0.14, sc.t0 + 0.36, E.outC), b = sc.noExit ? 0 : P(t, sc.t1 - 0.26, sc.t1 + 0.05, E.inC);
-        const ao = sc.noEnter ? 1 : Math.min(a, P(t, sc.inA, sc.inB, E.outC));   // 露出来的程度：动作照 a 走，透明度等上一张看不见了再升（1.3.1 换卡不叠）   // 数字卡等上一张退干净再进（盲审：年份卡进来时压在上一张没退干净的字上）
+        const ao = sc.noEnter ? 1 : Math.min(a, P(t, sc.inA, sc.inB, E.outC));   // 露出来的程度：动作照 a 走，透明度等上一张看不见了再升（1.3.1 换卡不叠）   // 数字卡等上一张退干净再进（检查：年份卡进来时压在上一张没退干净的字上）
         const v = sc.idx % 3;
         if (v === 1) set(sc.el, { o: ao * (1 - b), x: (1 - a) * 260 - b * 260, r: (1 - a) * 2.5 - b * 2.5, s: 1, b: (1 - a) * 6 + b * 6 });
         else if (v === 2) set(sc.el, { o: ao * (1 - b), s: (1.16 - 0.16 * a) * (1 - 0.1 * b), b: (1 - a) * 10 + b * 8 });

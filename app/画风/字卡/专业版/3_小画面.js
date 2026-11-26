@@ -1,5 +1,5 @@
 
-// ---------- 现成的小画面（2026-11-14 夜，总控批）：版式是提前画好的，模型只挑哪一种、填图标名和短词 ----------
+// ---------- 现成的小画面（2026-11-14 夜，定）：版式是提前画好的，模型只挑哪一种、填图标名和短词 ----------
 // 接在 写画面.js 后面。每一种 = HUA_KIT 里的一个函数 (S, d)：d 是把关以后的那几栏（词都是这几句字幕里原样的字，图标名都在名单里）。
 // 规矩（每一种都守）：第一样东西跟着卡进来，别的说到才出；东西收在 770×780 里，四边留 20；字不小于 44；一屏不超过三种颜色。
 // 颜色只用配色里的变量（白纸、方格本是浅底：写死的白色在浅底上看不见，11-14 夜改成按字色调淡）。
@@ -84,11 +84,11 @@ Object.assign(HUA_KIT, {
     const pp = S.paper(x0, y0, W, H), FZ = xhSame(rows, W - 176, RH - 20, 76); pp.style.overflow = 'hidden';
     const bg = xhBadge(S, d.图标, x0 + W - 74, y0 - 46);      // 11-16：填了图标的，纸的右上角多一块圆底托着它
     if (d.题) { xhLeft(xhT(S,d.题, 46, 30, W - 92, 92, { parent: pp, size: 68, color: 'rgba(34,30,23,.72)' })); S.box(46, 128, W - 92, 4, { background: 'rgba(34,30,23,.22)', borderRadius: '2px' }, pp); }
-    const ts = xhSeq(rows.map((r, i) => i || d.题 ? S.say(r) : S.in));   // 11-16：没有题的单子，头一行和纸一起进（原来纸先亮半秒才出字）   // 有题的单子先只出题，行跟着嘴来（盲看：头一行比嘴早了两秒）
+    const ts = xhSeq(rows.map((r, i) => i || d.题 ? S.say(r) : S.in));   // 11-16：没有题的单子，头一行和纸一起进（原来纸先亮半秒才出字）   // 有题的单子先只出题，行跟着嘴来（试看：头一行比嘴早了两秒）
     const its = rows.map((r, i) => {
       const y = top + i * RH, by = y + (RH - 64) / 2;
       const bx = S.box(46, by, 64, 64, { border: '6px solid ' + PRO_INK, borderRadius: '12px', boxSizing: 'border-box' }, pp);
-      const tick = xhMark(S, true, 74, 44, by - 12, pp, PRO_INK);   // 勾用墨色，不用绿色：单子里列的不一定是好事（盲看：差商家干的事打了绿勾）
+      const tick = xhMark(S, true, 74, 44, by - 12, pp, PRO_INK);   // 勾用墨色，不用绿色：单子里列的不一定是好事（试看：差商家干的事打了绿勾）
       const tx = xhLeft(xhT(S, r, 136, y + 10, W - 176, RH - 20, { parent: pp, size: FZ, color: PRO_INK }));
       return { bx, tick, tx };
     });
@@ -363,7 +363,7 @@ Object.assign(HUA_KIT, {
     return t => { const k = P(t, T, T + 0.45, E.outB); set(pp, { o: P(t, T, T + 0.15), y: (1 - k) * 50, r: -1.5 }); if (w) S.pop(w, t, Tw); if (bg) bg.upd(t, T + 0.25); };
   },
   图标词(S, name, word, small) {   // 一个图标配一个词。11-16：四种摆法轮着用（补的图标词一多，一个样子连着看会腻）；带小字的、词长的只用上下两种
-    if (!word) { const a = S.in, ic = S.icon(name, 300, 235, 70); return t => { ic.draw(P(t, a, a + 0.7, E.outC)); set(ic.e, { o: P(t, a, a + 0.1) }); }; }      // 总控 11-17：补的词太长又取不出短词的，只画图标（底下字幕照出）
+    if (!word) { const a = S.in, ic = S.icon(name, 300, 235, 70); return t => { ic.draw(P(t, a, a + 0.7, E.outC)); set(ic.e, { o: P(t, a, a + 0.1) }); }; }      // 11-17：补的词太长又取不出短词的，只画图标（底下字幕照出）
     const a = S.in, T = S.bu ? (S.say(word), a + 0.12) : S.say(word), side = !small && uW(String(word)) <= 4;      // 补的图标词：字跟着图标一起进，不等嘴说到
     const v = side ? HUA_TB.n++ % 4 : [0, 2][HUA_TB.m++ % 2];
     if (v === 0 || v === 2) {                              // 0 图标在上，一笔一笔描出来；2 一块圆底托着图标，鼓出来。词都在下面

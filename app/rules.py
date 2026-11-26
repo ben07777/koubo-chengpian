@@ -8,7 +8,7 @@ from pathlib import Path
 import jieba
 import shuzi
 jieba.setLogLevel(60)
-# 11-12 盲审中1：分词缓存放在软件自己的 runtime 夹里，不写系统临时夹，也不和电脑上别的 jieba 共用一份。
+# 11-12 检查中1：分词缓存放在软件自己的 runtime 夹里，不写系统临时夹，也不和电脑上别的 jieba 共用一份。
 # 服务器一启动就经 xieshou 载入本文件，赶在第一次切词之前定好。建不了夹就照 jieba 原样。
 try:
     (Path(__file__).resolve().parent.parent / 'runtime').mkdir(exist_ok=True)
@@ -266,7 +266,7 @@ def build(plan):
         elif ty == 'stat':
             w = rows[la]['word'] if rows[la]['word'] and re.search(r'\d', rows[la]['word']) else None
             if '数块' in shuzi.FIXES and w != s.get('raw'): w = None    # 11-09 第三轮：上屏词就是字幕里那个数的原样，才滚数；否则不画
-            if '数块' in shuzi.FIXES and w and (shuzi.neg_before(T[la], T[la].find(w)) or len(shuzi.digit_blocks(T[la])) >= 2): w = None   # 11-10 总控改判：「负增长3%」单画 3% 像正的；一句两个数（从2.5%降到1.8%），跳字没标签，单画前一个像现值：都不画
+            if '数块' in shuzi.FIXES and w and (shuzi.neg_before(T[la], T[la].find(w)) or len(shuzi.digit_blocks(T[la])) >= 2): w = None   # 11-10 改判：「负增长3%」单画 3% 像正的；一句两个数（从2.5%降到1.8%），跳字没标签，单画前一个像现值：都不画
             m = re.match(r'(\d+(?:\.\d+)?)(.*)', w or '')
             if m:
                 acts.append(dict(k='stat', value=float(m.group(1)), suffix=m.group(2), word=w, t=rows[la]['wt0'], t1=L[la]['t1'], line=la,
@@ -358,7 +358,7 @@ def build(plan):
 
 
 # 只画「东西」：人不画（人物闸，含中介、老板、朋友这类没进人物词表的人）；记号不画（星光、警示、勾叉、闪电、灯泡、靶心、涨跌箭头、问号），
-# 它们不是他说的那样东西，11-07 盲审查出星光一项就占全部图标的 22%，按句盲判里也是规则版的主要错因（万能占位）
+# 它们不是他说的那样东西，11-07 检查查出星光一项就占全部图标的 22%，按句检查里也是规则版的主要错因（万能占位）
 NOT_PROP = {'circle-question-mark', 'user', 'users', 'sparkles', 'triangle-alert', 'circle-x', 'circle-check', 'zap', 'lightbulb', 'target',
             'trending-up', 'trending-down', 'thumbs-up'}
 

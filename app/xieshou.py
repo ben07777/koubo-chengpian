@@ -12,7 +12,7 @@
 #   AI     把逐句文字（带开始秒）发给我们自己的「中转」（中转/中转.py），中转去叫模型、按句校验后回来；录音不发。
 #          软件里没有模型的钥匙。中转地址写在软件根目录 设置.json 的「中转地址」，空着就不走 AI。
 #          AI 回的只是每句「上屏词 / 道具 / 动作」和全片主角词；时间、词组、数字动作、句型段落仍由规则那套算，AI 的选择盖在上面。
-# 11-07 考卷盲判：规则版真帮上忙 9%、错 38%；AI 版 41%、错 6%（正本 考卷/AI剧本测试/结果.md，那次是 Claude 小模型，换国内模型要重测）。
+# 11-07 考卷检查：规则版真帮上忙 9%、错 38%；AI 版 41%、错 6%（正本 考卷/AI剧本测试/结果.md，那次是 Claude 小模型，换国内模型要重测）。
 import copy, hashlib, json, os, re, socket, ssl, threading, time, unicodedata, urllib.error, urllib.parse, urllib.request, uuid
 from pathlib import Path
 import donghua
@@ -22,7 +22,7 @@ import planner
 import shuzi
 from rules import pos_time
 
-VERSION = '1.4.1'   # 11-14 专业版施工：中转看到 1.4 起才给挑动画。只在施工夹里改了，没发版；发不发、叫几点几他定
+VERSION = '1.4.2'   # 软件版本号：首页角落显示它；报给中转（1.4 起才给配画面）；问有没有新版时拿它比
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT = '规则'
 TIMEOUT = 170                      # 等中转最多几秒；必须比中转的「总时限秒」（默认 85）和配画面那一路的「时限秒」（默认 150，外加收尾几秒）都长，不然软件先放弃。11-16：95 改 170（配画面要叫几遍、改、查，真跑两分半的片约一分钟）
@@ -45,7 +45,7 @@ CERT = Path(__file__).resolve().parent / 'zhongzhuan.pem'   # 中转那张证书
 def relay_url():
     u = (settings().get('中转地址') or '').strip().rstrip('/')
     u = u if not u or '://' in u else 'http://' + u                 # 漏写 http:// 也认
-    if u: u = u.split('://', 1)[0].lower() + '://' + u.split('://', 1)[1]   # 写成 HTTP://、Https:// 也认成小写（11-15 盲审：大写时带了证书也照样不加密地发）
+    if u: u = u.split('://', 1)[0].lower() + '://' + u.split('://', 1)[1]   # 写成 HTTP://、Https:// 也认成小写（11-15 检查：大写时带了证书也照样不加密地发）
     if u.startswith('http://') and CERT.exists(): u = 'https://' + u[7:]   # 带了证书就走加密，地址写成 http 也改过来
     return u
 
@@ -85,6 +85,60 @@ def _local(url):
     return '@' not in p.netloc and '\\' not in url and host in ('127.0.0.1', 'localhost', '::1')
 
 
+# ───────── 有没有新版（1.4.2）─────────
+# 软件打开后，在后台问一次自家服务器下载口（8791）上那份「最新版本」说明 zuixin.json。
+# 只带软件自己的版本号，不带设备号、次数码、录音、字幕。中转地址空着就不问。连不上、超时、回的不对，都当没有新版，不弹错。
+# 那条路不加密，所以回来的东西只信三样：版本号得是几个数字点起来的；下载地址只认这台服务器 8791 口上的 .zip；改了什么最多 60 个字，当纯文字显示。GitHub 地址写死在这里，不从服务器拿。
+GITHUB_REL = 'https://github.com/ben07777/koubo-chengpian/releases'
+XIN_PORT = 8791
+_XIN = [None, None]   # 问到的结果、正在问的线程
+
+
+def _vt(v):
+    return tuple(int(x) for x in re.findall(r'\d+', str(v))[:4])
+
+
+def xinban_url():
+    u = os.environ.get('KOUBO_XINBAN_URL', '').strip()           # 只给本机测试用
+    if u: return u
+    r = relay_url()
+    if not r: return ''
+    try: host = urllib.parse.urlsplit(r).hostname or ''
+    except ValueError: return ''
+    if not host or _local(r): return ''
+    return 'http://{}:{}/zuixin.json?v={}'.format(host, XIN_PORT, urllib.parse.quote(VERSION))
+
+
+def _xin_read(url, raw):
+    try: r = json.loads(raw.decode('utf-8'))
+    except Exception: return {}
+    if not isinstance(r, dict): return {}
+    v = str(r.get('版本') or '').strip()
+    if not re.fullmatch(r'\d{1,3}(\.\d{1,3}){1,3}', v) or _vt(v) <= _vt(VERSION): return {}
+    host = urllib.parse.urlsplit(url).hostname or ''
+    dl = str(r.get('下载') or '').strip()
+    if not re.fullmatch(r'http://' + re.escape(host) + ':' + str(XIN_PORT) + r'/[A-Za-z0-9._-]{1,80}\.zip', dl): dl = ''
+    note = ''.join(c for c in str(r.get('改了什么') or '') if c.isprintable()).strip()[:60]
+    return {'有新版': True, '版本': v, '下载': dl, 'GitHub': GITHUB_REL, '改了什么': note}
+
+
+def xinban(wait=4.0):
+    """有新版回 {有新版, 版本, 下载, GitHub, 改了什么}；没有、没问、没问到都回 {}。一个软件开着只问一次。"""
+    if _XIN[0] is None and not (_XIN[1] and _XIN[1].is_alive()):
+        url = xinban_url()
+        if not url: _XIN[0] = {}; return {}
+        def ask():
+            out = {}
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'koubo-chengpian/' + VERSION})
+                with urllib.request.urlopen(req, timeout=4) as f: out = _xin_read(url, f.read(4096))
+            except Exception: out = {}
+            _XIN[0] = out
+        _XIN[1] = threading.Thread(target=ask, daemon=True); _XIN[1].start()
+    if _XIN[1] and _XIN[1].is_alive(): _XIN[1].join(wait)
+    return _XIN[0] if isinstance(_XIN[0], dict) else {}
+
+
 _NAME = [0.0, {}, None]   # 上次问到的时刻、中转 /health 报的东西、正在问的线程
 def relay_info(wait=0.6):
     """中转 /health 报的：公示名（模型名）、专业版条数和天数、每台电脑试用几条。只问 /health，不发任何文字；问过的记 5 分钟。
@@ -122,7 +176,7 @@ QR_MAX = 2 * 1024 * 1024
 
 def sale_local():
     """开卖页的价钱、购买链接：读软件包里自带的 开卖.json（11-09 第三轮：传输加密之前，这两样不从服务器取，免得半路被换）。没配、配错都当没有，页面写「还没开卖」。
-    收款码 11-17 起不在包里（他定过收款码不进任何包），向中转要，见 pro_qr。"""
+    收款码 11-17 起不在包里（收款码不进任何包），向中转要，见 pro_qr。"""
     try: d = json.loads((ROOT / '开卖.json').read_text(encoding='utf-8'))
     except Exception: d = {}
     if not isinstance(d, dict): d = {}
@@ -148,9 +202,9 @@ def pro_info():
     return dict(条=n, 天=days, 试用=t if isinstance(t, int) and not isinstance(t, bool) and t >= 0 else None, model=relay_name(), 备案号=relay_beian(),
                 价钱=price, 链接=loc['链接'], 邮箱=loc['邮箱'],
                 那句话=SALES_LINE.format(价钱=price, 期限=term, 条数=n) if price and n and term else '', 期限=term, 退款=refund,
-                价钱句=SALES_LINE_NO_N.format(价钱=price) if price else '',   # 11-10 复审第 11 条：连不上中转时，价钱照样显示
+                价钱句=SALES_LINE_NO_N.format(价钱=price) if price else '',   # 11-10 检查第 11 条：连不上中转时，价钱照样显示
                 收款码=r.get('收款码') is True and code_safe(), 收款码说明=QR_LINE.format(价钱=price) if price else '', 连上=bool(r),
-                等=pos(r.get('等几秒')),                                 # 云端一条最多排几秒（中转配置「总时限秒」），开卖页明写（11-09 复审轻 1）
+                等=pos(r.get('等几秒')),                                 # 云端一条最多排几秒（中转配置「总时限秒」），开卖页明写（11-09 检查轻 1）
                 全站每天=r.get('全站每天') if isinstance(r.get('全站每天'), int) and not isinstance(r.get('全站每天'), bool) and r.get('全站每天') >= 0 else None)   # 0 = 不拦填了码的；None = 老中转没报   # 连上：问到了中转（开卖页分得清「连不上」和「价钱没设好」）
 
 
@@ -193,7 +247,7 @@ def device_id():
     _DEV.append(s); return s
 
 
-# ───────── 云端还剩几条：没填码的是试用（中转按电脑记），填了码的看次数码（中转按码记）（11-09 他定） ─────────
+# ───────── 云端还剩几条：没填码的是试用（中转按电脑记），填了码的看次数码（中转按码记）（11-09 定） ─────────
 TRIAL_FILE = ROOT / 'runtime' / '试用.json'      # 中转最近一次报的数，加上这台电脑云端排过的录音记号
 CODE_FILE = ROOT / 'runtime' / '次数码.txt'       # 用户填的次数码，只存在这台电脑
 CODE_ABC = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -209,7 +263,7 @@ def show_code(k): return '-'.join(k[i:i + 5] for i in range(0, len(k), 5)) if k 
 
 
 def cn_day(day):
-    """2027-11-09 → 2027 年 11 月 9 日；不是这个样子的回空（11-09 复审：中转回什么都不原样往外写）"""
+    """2027-11-09 → 2027 年 11 月 9 日；不是这个样子的回空（11-09 检查：中转回什么都不原样往外写）"""
     m = re.fullmatch(r'(\d{4})-(\d{2})-(\d{2})', day) if isinstance(day, str) else None
     return f'{m.group(1)} 年 {int(m.group(2))} 月 {int(m.group(3))} 日' if m else ''
 
@@ -218,7 +272,7 @@ def _n(v): return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v
 
 
 def _clean_code(m):
-    """中转报的码的样子，只留验过的：状态是那四样之一，剩 / 共 / 天是整数，开始 / 到期是 年-月-日。别的一概不要（11-09 复审中 9）。"""
+    """中转报的码的样子，只留验过的：状态是那四样之一，剩 / 共 / 天是整数，开始 / 到期是 年-月-日。别的一概不要（11-09 检查中 9）。"""
     if not isinstance(m, dict) or m.get('状态') not in ('能用', '用完', '到期', '不对'): return None
     out = {'状态': m['状态']}
     for x in ('剩', '共', '天'):
@@ -283,7 +337,7 @@ def _note(r, k=''):
     d = _cache()
     if _n(r.get('试用剩')) is not None and _n(r.get('试用共')) is not None: d.pop('不限', None); d.update(剩=r['试用剩'], 共=r['试用共'])
     elif r.get('不限') is True: d.pop('剩', None); d.pop('共', None); d['不限'] = True
-    m = _clean_code(r.get('码'))                                 # 只存验过的（11-09 复审中 9：原来原样存，刷新后照样在页面里跑）
+    m = _clean_code(r.get('码'))                                 # 只存验过的（11-09 检查中 9：原来原样存，刷新后照样在页面里跑）
     if k and m:
         d['码'] = m; d['码']['键'] = _ckey(k)
     _save_cache(d)
@@ -350,7 +404,7 @@ def ask_trial(force=False):
 
 _QR = [0.0, None]   # 上次向中转要到收款码的时刻、那张图
 def pro_qr():
-    """开卖页的收款码图片：向中转要（11-17 总控定：收款码只放服务器上，他定过不进任何包；换码只换服务器上那张图，软件不用重发）。
+    """开卖页的收款码图片：向中转要（11-17 定：收款码只放服务器上，不进任何包；换码只换服务器上那张图，软件不用重发）。
     只走加密的路（本机地址是自测用的）；要到的记 5 分钟。回 (图, 类型)；没开云端、连不上、没放、太大、不像图都回 None（页面就写「还没开卖」）。"""
     url = relay_url()
     if not url or not code_safe(url): return None
@@ -424,7 +478,7 @@ NEG_VERB = ('否认', '拒绝', '拒不', '避免', '反对', '防止', '禁止'
 STOP = '，,。.!！?？；;：:、 \n'
 NUM_TAIL = '.．-－~～—/／+＋%％点'                                       # 跟在数后面、截开就变了的字（2.4、50-60、1/3、2点4）
 NUM_TAILQ = '半次件位名户辆张份款例套笔宗桩趟颗枚粒棵株层届座场'
-NEG_PRE = re.compile(r'负(?:增长|的|值|数|收益率?|回报率?|利率)(?:了|是|为|约|达)?$')   # 11-10 总控改判：数前面紧挨着「负增长、负的」，截掉就成了正数（负增长3% 截成 3%）   # 11-10 复审：数加单位后面还跟着这些字，截到这里就丢了一截（3岁半、3000万人次、40亿件）
+NEG_PRE = re.compile(r'负(?:增长|的|值|数|收益率?|回报率?|利率)(?:了|是|为|约|达)?$')   # 11-10 改判：数前面紧挨着「负增长、负的」，截掉就成了正数（负增长3% 截成 3%）   # 11-10 检查：数加单位后面还跟着这些字，截到这里就丢了一截（3岁半、3000万人次、40亿件）
 UNIT = '倍天年月日周个元块毛角秒钟时小点半米斤克吨岁折股份家只张条次人项场度成号期届层级分%％‰'   # 数后面的单位：「两倍到三倍」「60天到90天」「2个月到3个月」往回找前一个数时跳过它们
 ASK_END = '吗呢么嘛'                                                    # 一句以这些收尾是问句，下一句开头就否定，是在否定它（AI会取代人吗 / 不可能）
 
@@ -479,14 +533,14 @@ def cut_ok(w, t, nxt=''):
         if w[-1] in NUM_TAIL and w[-1] not in '%％' and b in NUMC and (w[-1] != '点' or w[-2:-1] in NUMC): bad = True   # 「2点」「2.」：数的前半截（「重点1」不算）
         if (w[-1] == '分' and b == '之') or w.startswith('分之') or (w[0] == '之' and a == '分'): bad = True   # 「三分之一」截成 三分、分之一
         if any(c in NUMC for c in w) and b and b in NUM_TAILQ: bad = True
-        if w[0] in NUMC and NEG_PRE.search(t[s0:i]): bad = True              # 11-10 总控改判：「负增长3%」截成 3%     # 11-10 复审：「3岁半」截成 3岁、「3000万人次」截成 3000万人、「40亿件」截成 40亿
+        if w[0] in NUMC and NEG_PRE.search(t[s0:i]): bad = True              # 11-10 改判：「负增长3%」截成 3%     # 11-10 检查：「3岁半」截成 3岁、「3000万人次」截成 3000万人、「40亿件」截成 40亿
         if not bad: return True
         i = t.find(w, i + 1)
     return False
 
 
 def word_ok(w, text, nxt=''):
-    """云端挑的上屏词 w 能不能用（11-10 合并盲审：两头必须同一个判法，不然中转算用上、软件却没用，会多扣）：
+    """云端挑的上屏词 w 能不能用（11-10 合并检查：两头必须同一个判法，不然中转算用上、软件却没用，会多扣）：
     原样在这句里、截得完整（cut_ok）、不只盖住半个数（shuzi.whole_ok）、不丢紧贴着数的限定词（shuzi.qual_ok）。
     中转 check_line 是同一个判法，考卷 s18 拿一张词表两头逐个比，不一样就报错。"""
     return not w or (w in text and cut_ok(w, text, nxt) and shuzi.whole_ok(text, w) and shuzi.qual_ok(text, w))
@@ -502,7 +556,7 @@ def merge(j, ai):
         if not s: continue
         keep = copy.deepcopy(l)
         try: _merge_line(j, l, s, icons, texts[n + 1] if n + 1 < len(texts) else '')
-        except Exception: l.clear(); l.update(keep)            # 这一句盖不上就沿用规则的，不连累整条（第三轮盲审）
+        except Exception: l.clear(); l.update(keep)            # 这一句盖不上就沿用规则的，不连累整条（第三轮检查）
     hero = (ai.get('主角词') or '').strip() if isinstance(ai.get('主角词'), str) else ''
     if hero and hero != j.get('hero') and any(cut_ok(hero, ''.join(c[0] for c in l['cs'])) for l in j['lines']):
         old = j.get('hero'); j['hero'] = hero
@@ -516,8 +570,8 @@ def _merge_line(j, l, s, icons, nxt=''):
     """一句 AI 的上屏词 / 道具 / 动作盖到规则剧本这一句上。上屏词不在本句就不盖。nxt：下一句的原文。"""
     text = ''.join(c[0] for c in l['cs'])
     w = (s.get('上屏词') or '').strip(); ic = (s.get('道具') or '').strip()
-    if s.get('退回') is True or not word_ok(w, text, nxt): return   # 中转拦下或那一截没回来（标了退回）、或这头再查也不合格：这句整句沿用本机规则的（11-09 复审中 11：原来留空，云端比本机还差）；11-09 第三轮：只盖住半个数的也退回
-    if len(text) >= 6 and len(w) >= 0.8 * len(text): return             # 11-14 傍晚：整句（或差不多整句）照抄回来当上屏词，等于没挑，这句沿用本机规则的词（整片盲审：一分多钟里行行整行重点色）
+    if s.get('退回') is True or not word_ok(w, text, nxt): return   # 中转拦下或那一截没回来（标了退回）、或这头再查也不合格：这句整句沿用本机规则的（11-09 检查中 11：原来留空，云端比本机还差）；11-09 第三轮：只盖住半个数的也退回
+    if len(text) >= 6 and len(w) >= 0.8 * len(text): return             # 11-14 傍晚：整句（或差不多整句）照抄回来当上屏词，等于没挑，这句沿用本机规则的词（整片检查：一分多钟里行行整行重点色）
     if ic and (ic not in icons or ic in ('user', 'users')): ic = ''      # 人不画成图标（人物闸）
     if not w and not ic: return                                          # 11-09 第三轮：模型留空、只给人物图标：这句沿用本机规则的词，不空着
     if w:
@@ -550,7 +604,7 @@ def pro_items(ai, lines):
     except Exception: return [], []                              # 查的时候出任何岔子：一处都不画，照免费版的画法出
 
 
-PRO_RESTYLE = False   # 开关（2026-11-14 夜立，总控按默认值定的「做」；11-14 傍晚先关：整片盲审说免费版原样的清单、对话框、大数字更好读，换成纸和牌子不算变好。开关和代码留着，放哪边他还没定）：免费版自己认出来的大数字、排比清单、前后对比，换成纸、牌子的样子。关掉 = 这几处照免费版原样出
+PRO_RESTYLE = False   # 开关（2026-11-14 夜立，按默认值定的「做」；11-14 傍晚先关：整片检查说免费版原样的清单、对话框、大数字更好读，换成纸和牌子不算变好。开关和代码留着，放哪边还没定）：免费版自己认出来的大数字、排比清单、前后对比，换成纸、牌子的样子。关掉 = 这几处照免费版原样出
 
 
 def restyle_items(lines, dur, title=None, audio_end=None):
@@ -586,7 +640,7 @@ def _ai(lines, dur, title=None, audio_end=None, rec=None):
         except Exception: items = []                               # 合的时候出任何岔子：一处都不画，照免费版的画法出
     try: good, held = huamian.check_all(items, lines, DH_K)        # 11-15：整条片配画面（老的十三种 + 小画面）。本机这头再查一遍，以这头为准；查的时候出任何岔子，一处都不画
     except Exception: good, held = [], []
-    bu_n = 0; bu_got = 0 if '补图标' in ai else None; bu_drop = 0      # 11-18：补图标回来几张、和主画面撞了丢掉几张，记进修改页记录（他那条进片子 0 张，原来分不清是没回来还是被丢了）
+    bu_n = 0; bu_got = 0 if '补图标' in ai else None; bu_drop = 0      # 11-18：补图标回来几张、和主画面撞了丢掉几张，记进修改页记录（实测那条进片子 0 张，原来分不清是没回来还是被丢了）
     try:                                                           # 11-16：云端要是另外回了「补图标」（没配上画面的句子，各补一只图标一个词），这头查过、没和主画面撞上的才并进去。没回、回得不对，都当没有，和原来一样
         raw = ai.get('补图标')
         if raw:

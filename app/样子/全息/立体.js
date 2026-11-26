@@ -114,14 +114,14 @@ function measure(name) {
   return { name, ok: true, bodies: bodies.length, holes: holes.length, bits: bodies.filter(small).length, pinholes: holes.filter(l => l.area < 1.5).length, pts: loops.reduce((s, l) => s + l.pts.length, 0),
     lost: +lost.toFixed(3), cover: +cover.toFixed(3), recall: +(hit / Math.max(1, all)).toFixed(3) };
 }
-// 机器筛的线（量完 177 只、看过数怎么分布以后定的，写死在这里；改线要回总控）
+// 机器筛的线（量完 177 只、看过数怎么分布以后定的，写死在这里；改线要另外再定）
 const LINE = { lost: 0.42, bits: 3, bodies: 6, pinholes: 2, recall: 0.97 };
-// 总控 11-16 看过拼图定的：拿不准的一律平板，平板永远认得清。机器筛出来的里头 thermometer 改回立；机器没筛出来、看着偏密的七只改平板。合下来平板 22 只、立 155 只
+// 11-16 看过拼图定的：拿不准的一律平板，平板永远认得清。机器筛出来的里头 thermometer 改回立；机器没筛出来、看着偏密的七只改平板。合下来平板 22 只、立 155 只
 const RULED = { flat: ['bus', 'file-text', 'image', 'tractor', 'school', 'globe', 'fish'], stand: ['thermometer'] };
 function verdict(m) {
   if (!m.ok) return { stand: false, why: ['立不起来：' + m.err] };
-  if (RULED.stand.includes(m.name)) return { stand: true, why: [], ruled: '总控定：立（机器原来筛出来了）' };
-  if (RULED.flat.includes(m.name)) return { stand: false, why: ['总控定：改平板（机器没筛出来，看着偏密）'], ruled: '总控定：改平板' };
+  if (RULED.stand.includes(m.name)) return { stand: true, why: [], ruled: '人工定：立（机器原来筛出来了）' };
+  if (RULED.flat.includes(m.name)) return { stand: false, why: ['人工定：改平板（机器没筛出来，看着偏密）'], ruled: '人工定：改平板' };
   const why = [];
   if (m.lost > LINE.lost) why.push('糊：转过去以后，线条之间的空当被侧壁盖掉 ' + Math.round(m.lost * 100) + '%');
   if (m.pinholes >= LINE.pinholes) why.push('糊：有 ' + m.pinholes + ' 个针眼大的洞');
@@ -149,7 +149,7 @@ function grid(names, cols = 15) {
     g.fillText(m.ok ? `${v.stand ? '能立' : '改平板'} 盖${Math.round(m.lost * 100)}% ${m.bodies}块${m.bits ? '(小' + m.bits + ')' : ''} 洞${m.holes}${m.pinholes ? '(针' + m.pinholes + ')' : ''}` : '立不起来', x + 10, y + CW + 42);
   });
   const ok = out.filter(o => o.stand).length;
-  g.font = `600 30px ${CN}`; g.fillStyle = '#e8ffff'; g.fillText(`白名单 ${names.length} 只图标，全自动立成线框体（没手调任何一只）。绿条 = 立（${ok} 只），黄条 = 改平板（${names.length - ok} 只）。机器筛过，总控 11-16 又定了 8 只。「盖」= 转过去以后线条之间的空当被侧壁盖掉几成。`, 16, 44);
+  g.font = `600 30px ${CN}`; g.fillStyle = '#e8ffff'; g.fillText(`白名单 ${names.length} 只图标，全自动立成线框体（没手调任何一只）。绿条 = 立（${ok} 只），黄条 = 改平板（${names.length - ok} 只）。机器筛过，11-16 又人工定了 8 只。「盖」= 转过去以后线条之间的空当被侧壁盖掉几成。`, 16, 44);
   return { list: out, png: cvs.toDataURL('image/png').slice(22) };
 }
 window.SOLID_API = { measure, verdict, grid, LINE, RULED };

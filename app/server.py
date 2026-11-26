@@ -138,7 +138,8 @@ class H(BaseHTTPRequestHandler):
             if u.path == '/icons.js': return self.file(APP / '画风' / '公共' / 'icons.js')   # 校字页画图标用（和画风同一份 Lucide）
             if u.path == '/api/ping':
                 global LAST_PING; LAST_PING = time.time(); return self.send(200, {'app': '口播成片', 'home': str(ROOT)})      # 11-20：再双击「剪一条」时，靠这两样认出开着的就是这个文件夹的软件
-            if u.path == '/api/ver': return self.send(200, {'v': pipeline.xieshou.VERSION})   # 11-10：首页角落的版本号，读本机，不联网
+            if u.path == '/api/ver': return self.send(200, {'v': pipeline.xieshou.VERSION})   # 首页角落的版本号，读本机
+            if u.path == '/api/xinban': return self.send(200, pipeline.xieshou.xinban())      # 1.4.2：有没有新版（只带版本号问一次，问不到当没有）
             if u.path == '/api/styles':                                # 首页「画风」选择：有预览图、没标「首页列出: false」的才给选（11-12 起只剩字卡，首页那一行就不出）
                 out = []
                 for n in pipeline.render.listed_styles():
@@ -152,8 +153,8 @@ class H(BaseHTTPRequestHandler):
                 return self.file(APP / '画风' / n / '预览.jpg')
             if u.path == '/api/info':
                 x = pipeline.xieshou; p = pref(); agreed = p.get('云端已同意') is True
-                ai = p.get('云端排画面') if agreed else None; on = bool(x.relay_url()) and ai is True   # 11-09 盲审：没点过「知道了，用云端」就当没开
-                if x.relay_url(): x.device_id()                         # 算出设备号写进 runtime\设备号.txt（只在本机，不发），他要把自己的电脑设成不限时抄这串
+                ai = p.get('云端排画面') if agreed else None; on = bool(x.relay_url()) and ai is True   # 11-09 检查：没点过「知道了，用云端」就当没开
+                if x.relay_url(): x.device_id()                         # 算出设备号写进 runtime\设备号.txt（只在本机，不发），要把哪台电脑设成不限时，抄这串
                 trial = (x.ask_trial() if on else x.trial_info()) if x.relay_url() else {}   # 11-09：免费版一点不碰服务器。开了云端才问中转剩几条、问模型名；没开只用上次记的
                 beian = (x.relay_beian() if on else '') or str(x.settings().get('云端备案号') or '').strip()[:60]   # 11-09 第三轮 E：首页公示那句的备案号也从配置出
                 return self.send(200, dict(running=RUNNING, cloud=bool(x.relay_url()), model=(x.relay_name() if on else '') or x.settings().get('云端模型名') or '', beian=beian, ai=ai, agreed=agreed, trial=trial or None,
@@ -162,7 +163,7 @@ class H(BaseHTTPRequestHandler):
                 x = pipeline.xieshou; d = x.pro_info() if x.relay_url() else {}; d['model'] = d.get('model') or x.settings().get('云端模型名') or ''
                 if not d.get('备案号'): d['备案号'] = str(x.settings().get('云端备案号') or '').strip()[:60]
                 return self.send(200, d)
-            if u.path == '/api/shoukuanma':                            # 开卖页的收款码：向中转要，只走加密的路（11-17 总控定：收款码只放服务器上）
+            if u.path == '/api/shoukuanma':                            # 开卖页的收款码：向中转要，只走加密的路（11-17 定：收款码只放服务器上）
                 x = pipeline.xieshou; r = x.pro_qr() if x.relay_url() else None
                 if not r: return self.send(404, {'err': '没有收款码'})
                 return self.send(200, r[0], r[1])
@@ -253,7 +254,7 @@ class H(BaseHTTPRequestHandler):
                 k = x.norm_code(v)
                 if v and not k: raise ValueError('次数码的格式不对：应该是 20 个字母和数字，可以带短横，比如 ABCDE-FGH23-JKMNP-QRS45')
                 x.set_code(k)
-                if k and not agreed():                                 # 11-09 盲审：还没点过「知道了，用云端」：码只存在本机，不发给中转，先出同意说明
+                if k and not agreed():                                 # 11-09 检查：还没点过「知道了，用云端」：码只存在本机，不发给中转，先出同意说明
                     return self.send(200, dict(ok=True, code=x.show_code(k), ai=False, need_agree=True, trial=x.trial_info() or None))
                 if k:                                                  # 填了码就是要用云端：开关打开，问一次中转
                     set_pref(云端排画面=True)
@@ -290,7 +291,7 @@ _PREF_LOCK = threading.RLock()                   # 同一个线程能重复进�
 
 
 def agreed():
-    """看过同意说明、点过「知道了，用云端」没有。没点过，什么都不往中转发（11-09 盲审）。"""
+    """看过同意说明、点过「知道了，用云端」没有。没点过，什么都不往中转发（11-09 检查）。"""
     return pref().get('云端已同意') is True
 
 

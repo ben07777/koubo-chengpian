@@ -1,5 +1,5 @@
 # 看内容定画面：把逐字听写变成「分镜计划」（plan）。
-# 不联网、不用钥匙：靠中文口播里的常见信号判断画面——
+# 本机规则，不叫模型、不用钥匙：靠中文口播里的常见信号判断画面——
 #   数字 → 滚数；A 到 B → 区间条；第一第二第三 → 清单卡；很多人以为…其实 → 误区卡；
 #   以前…现在 / 不是…而是 / A，B 却… → 对比两栏；不是A，就是B（分两句说）→ 划掉改写；
 #   两件事：A 和 B → 圆章；因为 A / 所以 B → 因果箭头；2019 年 … 2023 年 → 年份时间线；
@@ -62,11 +62,11 @@ def cause_weak(b):   # 结果半句只是「你看啊」「我觉得吧」「接
     b = re.sub('[啊吧呢嘛呀]+$', '', str(b))
     return len(b) < 2 or re.fullmatch('(你看|我觉得|我跟你说|就是说|也就是说)', b) is not None or re.match('(接下来|下面|那|今天)?(我们|我)?(就|来)?(讲讲|讲一讲|说说|说一说|聊聊|聊一聊|给大家讲|跟大家聊|跟大家说)', b) is not None
 Q_RE = re.compile(r'([?？]$|为什么|为啥|怎么办|怎么|是不是|能不能|要不要|吗$|呢$|多少)')   # 像问句（模板不挂在这种句子上；问号卡另用 is_question）
-# 11-12 夜盲审七处之二：问号卡认不准就不用。两条都满足才给——一，句子里有疑问的词（什么、怎么、为什么、多少、能不能、是不是、X不X 这类）；
+# 11-12 夜检查七处之二：问号卡认不准就不用。两条都满足才给——一，句子里有疑问的词（什么、怎么、为什么、多少、能不能、是不是、X不X 这类）；
 # 二，句尾是「呢、吗、么」。只满足一条的照普通句走（「就关系到还剩多少」「能不能及时组织起来」不给，「用起来到底可靠不可靠呢」给）
-Q_WORD = re.compile(r'(什么|怎么|为什么|为啥|多少|([\u4e00-\u9fff]{1,2})[不没]\2)')   # 只认总控列的这几类；「哪些事呢」是半句，不算
+Q_WORD = re.compile(r'(什么|怎么|为什么|为啥|多少|([\u4e00-\u9fff]{1,2})[不没]\2)')   # 只认列出的这几类；「哪些事呢」是半句，不算
 Q_END = re.compile(r'(呢|吗|(?<![什怎那这多要])么)[？?]?$')   # 「锁什么」「那么」的么不是句尾的问话字
-Q_RULE = {'两条都要': True}   # 11-13 总控定：问号卡只看两条（疑问的词 + 句尾呢吗么），前后停顿这版不管   # 必过考卷的牙单关用
+Q_RULE = {'两条都要': True}   # 11-13 定：问号卡只看两条（疑问的词 + 句尾呢吗么），前后停顿这版不管   # 必过考卷的牙单关用
 
 
 def is_question(s):
@@ -121,7 +121,7 @@ ICON_CN = {'banknote': '钞票', 'battery-charging': '充电的电池', 'battery
          'users': '一群人', 'utensils': '刀叉', 'wallet': '钱包', 'zap': '闪电'}
 
 
-# 11-12 总控令（这一版必修）：字卡按句型挂的图标收紧，开着「图标」开关才这样，关着照 11-06 老样子。
+# 11-12 改（这一版必修）：字卡按句型挂的图标收紧，开着「图标」开关才这样，关着照 11-06 老样子。
 #   ① 记号不自动挂：星光、一个人、一群人、问号、警示牌、勾、叉、闪电、灯泡、靶心、涨跌箭头、点赞（和 rules.NOT_PROP 同一张单）；
 #   ② 开场、封面没撞上词就空着，不补星光；③ 拿软件自己的切词，整个词和表里的词一样才挂，半截撞上的不挂（大家伙、出差别、有钱）；
 #   ④ 表里去掉「工作」「身体」（蛋白质的工作、身体里的蛋白质画成公文包、心跳），「油」不配汽车（油气、油多不等于电多）。
@@ -216,7 +216,7 @@ def build_lines(chars):
         if best: return best
         free = [b for b in range(4, min(len(ln) - 2, 15) + 1) if id(ln[b - 1]) not in bad]   # 词边界都在数中间：找最近一个不切数的地方
         if free: return min(free, key=lambda b: abs(b - len(ln) / 2))
-        if '数块' in FIXES:   # 11-10 复审：一个数块占了大半行（「年收入3000多万到5000多万」）：不从数中间硬切；行太长（20 字以上）才在块外最近处断
+        if '数块' in FIXES:   # 11-10 检查：一个数块占了大半行（「年收入3000多万到5000多万」）：不从数中间硬切；行太长（20 字以上）才在块外最近处断
             alt = [b for b in range(2, len(ln) - 1) if id(ln[b - 1]) not in bad]
             return min(alt, key=lambda b: abs(b - len(ln) / 2)) if alt and len(ln) > 20 else None
         return min(len(ln) // 2 + 1, 15)
@@ -230,7 +230,7 @@ def build_lines(chars):
             k = comma(ln); out.append(ln[:k]); ln = ln[k:]
         while len(ln) > 15:
             cut = next((i + 1 for i in range(min(len(ln), 15) - 1, 3, -1) if ln[i].get('p') and len(ln) - i - 1 >= 2 and id(ln[i]) not in bad), None) or word_cut(ln)
-            if not cut: break                                # 11-10 复审：只剩从数中间切的地方，这一行整个留着
+            if not cut: break                                # 11-10 检查：只剩从数中间切的地方，这一行整个留着
             out.append(ln[:cut]); ln = ln[cut:]
         if ln: out.append(ln)
     res = []
@@ -248,7 +248,7 @@ def bad_cuts(chars):
     text, ends = '', []
     for k, ch in enumerate(chars):
         text += ch['c']; ends.append(len(text))
-        if not re.match(r'[到至]\d', ''.join(c['c'] for c in chars[k + 1:k + 3])): text += ch.get('p', '')   # 11-10 复审：「3000多万，到5000多万」逗号两边是一个范围，算一块
+        if not re.match(r'[到至]\d', ''.join(c['c'] for c in chars[k + 1:k + 3])): text += ch.get('p', '')   # 11-10 检查：「3000多万，到5000多万」逗号两边是一个范围，算一块
     sp = shuzi.blocks(text)
     return {id(ch) for ch, e in zip(chars, ends) if shuzi.splits(sp, e)}
 
@@ -299,7 +299,7 @@ def strip_filler(s):
     return s
 
 
-# 11-12 夜盲审七处之六：标重点别标虚词。下面这些词不标（总控列的加同类），一句里挑不出实词就不标。
+# 11-12 夜检查七处之六：标重点别标虚词。下面这些词不标（列出的加同类），一句里挑不出实词就不标。
 KW_RULE = {'不标虚词': True}   # 必过考卷的牙单关用
 KW_STOP = set("""比如 例如 大家 我们 他们 你们 咱们 她们 它们 对方 自己 别人 人家 开头 然后 就是 这个 那个 这些 那些 这样 那样 这种 那种 这里 那里
 有没有 能不能 是不是 会不会 要不要 可不可以 什么 怎么 怎么样 为什么 因为 所以 但是 不过 其实 而且 或者 还是 还有 已经 可能 应该 可以 需要 知道 觉得 认为 发现
@@ -360,7 +360,7 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
         scenes.append(dict(type=typ, la=a, lb=b, **kw))
 
     def q_card(k, a):
-        """第 k 句（软开头从第 a 句起）配不配问号卡：真问句、不少于四个字（11-13 总控定：前后停顿这版不管）。"""
+        """第 k 句（软开头从第 a 句起）配不配问号卡：真问句、不少于四个字（11-13 定：前后停顿这版不管）。"""
         return is_question(T[k]) and len(T[k]) >= 4
 
     # 开场：头一两行做大字标题，说完飞到顶上
@@ -376,7 +376,7 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
     if title:
         tl = [x for x in title if x.strip()][:2]
     elif '封面' in FIXES:
-        # 11-10（1.2 复审挑出、新版同样有）：封面和片头顶上那条标题另算，开场大字逐字跳的那几行不动。
+        # 11-10（1.2 检查挑出、新版同样有）：封面和片头顶上那条标题另算，开场大字逐字跳的那几行不动。
         # 字数照老版的数法（听写补回的小数点、负号这些不算），老版出两行的这版也出两行；
         # 第一句被字幕拆成两行、第二行带数的，封面也两行一起放，不再只剩半句（「毛利率从38.2%」后面的「降到31.5%」）。
         ce = 1 if n == 1 or n and n12(T[0]) >= 9 else 2
@@ -384,7 +384,7 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
         if ce == 2 and is_cue(1) and not NUM_RE.search(T[0]): ce = 1
         if ce == 1 and n > 1 and n12(T[0]) + n12(T[1]) <= 22 and lines[1]['t0'] - lines[0]['t1'] < 0.3 and (not is_cue(1) or lines[0].get('se') is False):
             ce = 2
-        half = '数块' in FIXES and 0 < ce < n and re.match(r'[到至]\d', T[ce]) and re.search(r'\d', T[ce - 1])   # 11-10 总控改判：封面最后一行后面接着「到5000多万」，范围被拆开了
+        half = '数块' in FIXES and 0 < ce < n and re.match(r'[到至]\d', T[ce]) and re.search(r'\d', T[ce - 1])   # 11-10 改判：封面最后一行后面接着「到5000多万」，范围被拆开了
         if half and ce == 1 and n12(T[0]) + n12(T[1]) <= 26: ce, half = 2, False   # 放得下：两行一起放
         ch = [strip_filler(T[k]) for k in range(ce)]
         if half:                                              # 放不下：这一行的数不上封面，封面停在数前面
@@ -561,13 +561,13 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
                                     or (broken[i] in ('head', 'both') and m[2] == 0)):
             m = None                                 # 「发电量10 / 58万亿度」：数被切成两半，哪半都不能单拿出来滚
         if m and '数块' in FIXES and ((i + 1 < n and re.match(r'[到至]\d', T[i + 1]) and re.search(r'\d', T[i])) or (i > 0 and re.match(r'[到至]\d', T[i]) and re.search(r'\d', T[i - 1]))):
-            m = None                                 # 11-10 总控改判：范围被拆在两行（「年收入3000多万 / 到5000多万」），哪半都不单画
+            m = None                                 # 11-10 改判：范围被拆在两行（「年收入3000多万 / 到5000多万」），哪半都不单画
         if m and not m[1] and '数字' in FIXES:
             nu = shuzi.unit_from_next(lines, i) if sn.endswith(fmt(m[0])) else ''
             if nu: m = (m[0], nu, m[2])              # 「平台的40 / 亿件商品」：单位被切到下一行
         if m and not m[1] and re.search(shuzi.MONEY_PRE if '数字' in FIXES else shuzi.MONEY_PRE.replace('|人均', ''), sn[max(0, m[2] - 6):m[2]]) and m[0] >= 10 \
                 and not re.match(r'[\d.,]+\s*[单个人件次点名位台条家只份]', sn[m[2]:]):
-            m = (m[0], '元', m[2])                  # 钱字紧挨着这个数才补「元」（盲审：「下个月10号发工资」补成 10元）
+            m = (m[0], '元', m[2])                  # 钱字紧挨着这个数才补「元」（检查：「下个月10号发工资」补成 10元）
         if m and not m[1] and '数字' in FIXES:
             m = None                                 # 没有单位的数（「是41」「100兆番」）观众看不懂，不做数字卡
         raw = None
@@ -611,7 +611,7 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
         # 其余：大字逐字跳，最多 3 行一组
         j = i + 1
         while j < n and j < i + 3 and not is_cue(j) and not flip_at(j) and not but_at(j) and not cause_at(j) and lines[j]['t1'] - lines[i]['t0'] < 6.5                 and not (CTA_RE.search(T[j]) and j >= n - 3) \
-                and not ('封面' in FIXES and re.search(r'\d', s) and is_question(T[j]) and len(T[j]) >= 4)                 and not (Q_RULE['两条都要'] and q_card(j, j)):   # 11-12 夜盲审七处之二：真问句不并进大字组，自己出问号卡   # 11-10：带数的这句没画数字大字，后面的问句照出问号卡，不并进大字组
+                and not ('封面' in FIXES and re.search(r'\d', s) and is_question(T[j]) and len(T[j]) >= 4)                 and not (Q_RULE['两条都要'] and q_card(j, j)):   # 11-12 夜检查七处之二：真问句不并进大字组，自己出问号卡   # 11-10：带数的这句没画数字大字，后面的问句照出问号卡，不并进大字组
             j += 1
         add('say', lead, j, icon=scene_icon(''.join(T[i:j])))
         i = j
@@ -637,7 +637,7 @@ def plan(lines, dur, title=None, theme='night', tag=None, audio_end=None, pro=No
     # 时间：镜头从第一句话前 0.15 秒开始，到下一个镜头开始为止
     del PRO_LOG[:]
     if pro: scenes = pro_place(scenes, lines, T, dur, pro)   # 1.4 专业版：云端挑的动画先占住那几句（pro 不给就和免费版一模一样）
-    scenes = cards(scenes, lines, T, dur)   # 11-12 夜盲审七处：普通句卡按停顿分卡、模板做完要停住、数字卡对的数停够 0.8 秒，三样互相牵着，一起排到不再变（见 cards）
+    scenes = cards(scenes, lines, T, dur)   # 11-12 夜检查七处：普通句卡按停顿分卡、模板做完要停住、数字卡对的数停够 0.8 秒，三样互相牵着，一起排到不再变（见 cards）
     if '句卡' in FIXES: para_fold_all(scenes, lines)                                      # 普通句卡的折点（一排最多八个字），按最后的卡算
 
     if not tag:
@@ -675,7 +675,7 @@ def timing(scenes, lines, dur):
         sc['t1'] = scenes[k + 1]['t0'] if k + 1 < len(scenes) else dur
 
 
-# ---------- 普通句卡新排法：折行、字号、拆卡（11-12 夜总控改规矩，和 seek.js 的 sayPara 一个算法，两边一起改） ----------
+# ---------- 普通句卡新排法：折行、字号、拆卡（11-12 夜改规矩，和 seek.js 的 sayPara 一个算法，两边一起改） ----------
 # 一排最多八个字，超了按词折行；字号下限 90、上限 120（说过的缩到八成，不小于 72，缩到 360 宽够 24 像素高）。
 # 字宽：中文一个字算 1，字母数字一个算 0.62（「ai」这种两个字母的字块算 1.24）。折点记的是第几个字块前折（不是第几个字）。
 # 一句的卡居中，排出来最宽 640（推近 1.03 倍右边才不过 870）：一排最多 7 个字，8 个 90 号字 720 宽放不下。
@@ -790,7 +790,7 @@ def para_card(lines, a, b, tp=None):
             hs.append(h)
         return sum(h * PARA_SHR + G for h in hs[:-1]) + hs[-1]
     H = height(fs)
-    while CARD_RULE['先缩字'] and H > PARA_HMAX and fs > PARA_FS[0]:   # 11-12 夜盲审七处之四：高装不下先缩字，缩到 90 为止，还装不下才拆（seek.js sayPara 同一算法）
+    while CARD_RULE['先缩字'] and H > PARA_HMAX and fs > PARA_FS[0]:   # 11-12 夜检查七处之四：高装不下先缩字，缩到 90 为止，还装不下才拆（seek.js sayPara 同一算法）
         fs -= 1; H = height(fs)
     return cuts, fs, H
 
@@ -815,7 +815,7 @@ def para_fold_all(scenes, lines):
     """按最后的卡给普通句卡、问号卡每句写折点 pcut（列表）；不用折的不写。带图形模板那张卡不是这个排法，不写。"""
     for ln in lines: ln.pop('pcut', None)
     for sc in scenes:
-        if sc['type'] == 'question' and PARA_RULE['问号卡']:   # 问号卡下面那句（11-12 夜总控）：照一句的普通句卡折，一排最多七个字；带软开头的两句各折各的，不拆卡
+        if sc['type'] == 'question' and PARA_RULE['问号卡']:   # 问号卡下面那句（11-12 夜）：照一句的普通句卡折，一排最多七个字；带软开头的两句各折各的，不拆卡
             for i in range(sc['la'], sc['lb']):
                 c = para_fold(lines[i], PARA_ROW1)
                 if c: lines[i]['pcut'] = c
@@ -848,7 +848,7 @@ def para_fold_line(j, l):
     if c: l['pcut'] = c
 
 
-# ---------- 按意思挂的模板（1.3.2，11-13 夜总控定十种；钱不单做，钱数照旧走数字卡） ----------
+# ---------- 按意思挂的模板（1.3.2，11-13 夜定十种；钱不单做，钱数照旧走数字卡） ----------
 # 方案：画风重做_2026-11-12/说法模板与底色_方案.md 第三、四节；1.3.2 单子在共用笔记夹「口播成片_1.3.2模板单子_1113.md」。认字眼在这里，画风（seek.js）只照 scenes[].tpl 画，不自己猜。
 # 只动字的（接在普通句卡新排法里，这句变灰缩小时记号留在原地到卡结束）：
 #   禁止·圈加斜杠（ban）、举例·拎出来（example）、注意·框住和四个角（attn）、自动化·打勾（auto）、引话·对话框（quote：框住说出来的那句话）。
@@ -859,11 +859,11 @@ def para_fold_line(j, l):
 # 停多久（时间以「开始淡出」为准，不以换完为准）：
 #   只动字的：主动作做完到这张卡开始淡出不少于 0.5 秒；这句是卡尾、停不够的，下一张卡可以等那句开口才换（借 0.15 秒，字不比嘴晚；
 #     下一张是数字卡、年份卡、区间卡的不借，它们停不停得够照原来的换卡时刻算）；还不够就不用。不为它拖卡。
-#   带图形的：主动作最晚在关键词最后一个字开口时做完；做完到开始淡出不少于 0.8 秒；不借下一句，下一张卡最晚在那句开口时换（11-13 夜总控：字不许比嘴晚，盖过 11-12 的借 0.15 秒）；不够就不用。
+#   带图形的：主动作最晚在关键词最后一个字开口时做完；做完到开始淡出不少于 0.8 秒；不借下一句，下一张卡最晚在那句开口时换（11-13 夜：字不许比嘴晚，盖过 11-12 的借 0.15 秒）；不够就不用。
 #   排比：最后一条开口后 0.3 秒出齐，出齐到开始淡出不少于 0.5 秒。
 # 分卡（1.3.2）：连着两句认出同一种带图形的（钟点除外），合成一张卡；带图形的那句，前一句和它是一口气（停不到 0.2 秒）的，一起上这张卡。
 # 卡怎么退（seek.js 卡的进退）：换卡时刻 t1 前 0.26 秒开始淡出，t1 后 0.05 秒退完。
-TPL_FADE, TPL_GONE, TPL_BORROW, TPL_TBORROW = 0.26, 0.05, 0.0, 0.15   # 带图形的不借（11-13 夜总控，原 0.15）
+TPL_FADE, TPL_GONE, TPL_BORROW, TPL_TBORROW = 0.26, 0.05, 0.0, 0.15   # 带图形的不借（11-13 夜，原 0.15）
 TPL_HOLD = {'ban': 0.5, 'example': 0.5, 'attn': 0.5, 'auto': 0.5, 'quote': 0.5, 'para': 0.5, 'time': 0.8, 'grow': 0.8, 'drop': 0.8}
 TPL_GRAPH = ('time', 'grow', 'drop')
 TPL_TEXT = ('ban', 'example', 'attn', 'auto', 'quote')
@@ -1085,7 +1085,7 @@ def tpl_long(s, tk):
 
 
 def tpl_attn(s, tk):
-    """注意（1.3.2 改法，11-12 盲审「框错了词」「只是记号」）：
+    """注意（1.3.2 改法，11-12 检查「框错了词」「只是记号」）：
     危险类（踩坑、有坑、有风险、风险大、异常、小心、当心、警惕）四个角、坏色，框危险的那个词；「小心骗子」框「骗子」，小心后面没有词的不认；
     「小心翼翼」「不小心」「没有风险」「异常值」「异常检测」不认。
     提醒类（记着、记住、注意、留意）框这句的重点词，不框「记着」本身：「这个细节大家记着」框「细节」，「注意安全」框「安全」；找不到重点词的（别高兴太早）不出；
@@ -1255,7 +1255,7 @@ def tpl_find(scenes, lines, T):
     return found
 
 
-# ---------- 排卡后半截（11-12 夜盲审七处之一、三、四） ----------
+# ---------- 排卡后半截（11-12 夜检查七处之一、三、四） ----------
 # 普通句卡不再按「最多三句、6.5 秒」一组：两张别的卡之间的普通句连成一段，一起分卡：
 #   1. 装不下先缩字，缩到 90 为止，还装不下才拆（para_card 里缩）。
 #   2. 换卡点优先落在句间停顿大的地方；两句之间隔不到 0.2 秒的不拆到两张卡上，除非这张卡已经四句、或者缩到 90 还装不下。一张卡一到四句。
@@ -1266,7 +1266,7 @@ def tpl_find(scenes, lines, T):
 # 模板（规矩见上面「按意思挂的模板」）：主动作做完以后大样子原样停住，只动字的不少于 0.5 秒，带图形的不少于 0.8 秒，这期间这句不许缩小变灰
 #   （只动字的：停到这张卡开始淡出、或者同一张卡下一句冒头，哪个早算哪个）。停不够依次：先把动作提早（关键词一开口就做）；
 #   还不够，把这句排成这张卡的最后一句（分卡时罚分，让它当卡尾）；再不够，这句不用模板。时刻都按每秒 30 帧对齐，再多留一帧。
-# 数字卡、年份卡、区间卡（11-12 夜盲审七处之一）：屏上只出现这句话里的数，不滚数；对的数从完整出现到这张卡开始淡出不少于 0.8 秒，
+# 数字卡、年份卡、区间卡（11-12 夜检查七处之一）：屏上只出现这句话里的数，不滚数；对的数从完整出现到这张卡开始淡出不少于 0.8 秒，
 #   不够的这句不做数字卡，照普通句卡走，数用重点色（标亮词换成这个数）。
 CARD_RULE = {'看停顿': True, '短句不打头': True, '单句要停顿': True, '的了呢不打头': True, '先缩字': True}   # 必过考卷的牙单关用；软件里一直开着
 CARD_MAX, GAP_KEEP, GAP_ONE, HEAD_MIN, HEAD_BAD = 4, 0.2, 0.3, 4, ('的', '了', '呢')
@@ -1533,7 +1533,7 @@ def cards(scenes, lines, T, dur):
     return S
 
 
-# ---------- 对比卡（11-12 夜盲审七处之五） ----------
+# ---------- 对比卡（11-12 夜检查七处之五） ----------
 # 这张卡期间说的每一句话都要在主区（画面 545–1345）出现过，字号不低于 72；盒子里的字去掉句首的语气字（呢、啊、呀、哎、嗯）；「现在」盒子右边收到 870 以内。
 # 选的排法：「以前」「现在」两个盒子上下摆（原样），每边按句分块，说到哪句盒子里出哪句——一边不超过三排就一句句往下摞，摞不下就换成正在说的那句。
 CMP_RULE = {'每句都上': True, '去语气字': True}   # 必过考卷的牙单关用
@@ -1631,7 +1631,7 @@ def split_title(head, ln=len):
         bounds, at = [], 0
         for w in jieba.cut(head):
             at += len(w); bounds.append(at)
-        inside = lambda b: (head[b - 1] in NUM_CH + '.．点' and head[b] in NUM_CH + '.．%％') or (head[b - 1] in NUM_CH and head[b] in '点')   # 不从一个数中间断：「睡7 / 点5个小时」（11-09 复审）
+        inside = lambda b: (head[b - 1] in NUM_CH + '.．点' and head[b] in NUM_CH + '.．%％') or (head[b - 1] in NUM_CH and head[b] in '点')   # 不从一个数中间断：「睡7 / 点5个小时」（11-09 检查）
         L = ln(head)
         ok = [b for b in bounds if 3 <= ln(head[:b]) <= L - 3 and ln(head[:b]) <= 12 and L - ln(head[:b]) <= 13 and not inside(b) and not shuzi.splits(sp, b)]
         if ok: k = min(ok, key=lambda b: abs(ln(head[:b]) - L / 2))
@@ -1665,7 +1665,7 @@ def num_in(s):
         if pv == '双' or (pv.isascii() and pv.isalpha()):   # 「双11」「iPhone15」是名字
             continue
         if '数字' in FIXES and pv == '点' and re.search(r'[\d零〇一二两三四五六七八九十]点$', s[:m.start()]):
-            continue                                 # 11-09 盲审：「3点15分」是钟点，「2点4倍」的 4倍 是后半个数，都不单拿
+            continue                                 # 11-09 检查：「3点15分」是钟点，「2点4倍」的 4倍 是后半个数，都不单拿
         p2 = s[max(0, m.start() - 2):m.start()]
         if pv == '第' or (not unit and pv == ' ' and p2[:1].isascii() and p2[:1].isalpha()) or (not unit and p2 in ('小米', '红米', '苹果', '华为', '荣耀', '三星', '一加', '魅族')):   # 「第10名」「iPhone 15」「小米14」；「ROE 15%」「苹果15块」带单位的照常
             continue
@@ -1733,7 +1733,7 @@ def try_pair(T, i):
     return None
 
 
-# 11-12 夜盲审七处之七：清单条目去掉残头。「第一件呢叫扛不住」切走「第一」以后剩「件呢叫扛不住」，把「件呢叫」这截也去掉，只留「扛不住」。
+# 11-12 夜检查七处之七：清单条目去掉残头。「第一件呢叫扛不住」切走「第一」以后剩「件呢叫扛不住」，把「件呢叫」这截也去掉，只留「扛不住」。
 LIST_RULE = {'去残头': True}   # 必过考卷的牙单关用
 LIST_HEAD = re.compile(r'^(?:[件样种类招项块个点条步](?=[呢啊呀嘛吧也就叫是，,、：:。\s]|$))?[呢啊呀嘛吧]*(?:也就是|就是|就叫|叫做|叫|是)?[，,、：:。\s]*')
 
@@ -1787,9 +1787,9 @@ def try_list(T, i):
 # 云端模型挑的动画（xieshou 用 donghua.check_all 查过的）排进卡里：盖住的那几句换成一张 type='pro' 的卡，底下字幕照出。
 # 排不进去的（盖到开场、收尾，只盖住清单、对比这类卡的一部分，做完停不够 0.8 秒）整处不要，那几句照免费版的画法走。
 # plan(..., pro=None)：不给 pro，下面这些一行都不跑，免费版的排法一点不变。
-PRO_HOLD = 0.8                                      # 最后一样东西落定后，到卡开始淡出，至少停这么久（此前 11-14 夜放到 0.5，现改回 0.8，因为整片盲审指出三处牌子约 1 秒就没了；总控令改回）
+PRO_HOLD = 0.8                                      # 最后一样东西落定后，到卡开始淡出，至少停这么久（此前 11-14 夜放到 0.5，现改回 0.8，因为整片检查指出三处牌子约 1 秒就没了）
 PRO_EAT = ('stat', 'range', 'year', 'question')     # 动画只盖住这几种卡的一部分时，连整张一起盖（它们只是一两句话换个画法）
-PRO_BORROW = 1.5                                    # 往后多盖的那句最长几秒：再长，画面停在上一件事上、嘴已经说了半天下一件事（11-14 盲审：预算 1000 块那张纸多赖了两秒多）
+PRO_BORROW = 1.5                                    # 往后多盖的那句最长几秒：再长，画面停在上一件事上、嘴已经说了半天下一件事（11-14 检查：预算 1000 块那张纸多赖了两秒多）
 PRO_SPAN = 5                                        # 连盖带往后借，一张动画卡最多几句
 PRO_OWN = 3.0                                       # 模型自己圈进来、但卡上没有它的字的那句，拿来停够时最长几秒
 PRO_NUMK = ('亮出大数', '占多少', '比多少', '几组对比')   # 带数的动画：只有它们可以把免费版的大数字卡换掉
@@ -1883,7 +1883,7 @@ def _pro_tight(c, lines):
 
 def pro_place(scenes, lines, T, dur, pro):
     """把查过的动画排进去（分卡之前）。scenes：plan 认出来的句型段落（还没分卡、没定时间）；pro：donghua.check_all 合格的那几处。
-    11-14 傍晚（整片盲审之后）：卡只盖字实际占的那几句（前头没有字的句子还给普通句卡，卡一进来就有东西，不再只剩一根横线）；
+    11-14 傍晚（整片检查之后）：卡只盖字实际占的那几句（前头没有字的句子还给普通句卡，卡一进来就有东西，不再只剩一根横线）；
     不带数的动画不许盖免费版的大数字卡、年份卡（那张本来更好看）；免费版已经一条一条排开的清单不重复；盖到对话框的，纸条画进对话框里。"""
     n = len(lines)
     S = [dict(x) for x in scenes]

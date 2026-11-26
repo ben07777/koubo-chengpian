@@ -167,7 +167,7 @@ def icons():
 
 
 def mixed_check(k, ws, span):
-    """并列的几样里混着一好一坏、或者中间有转过来的话 → 不算并列，拦下（11-14 盲看：「显得生份 / 既体面 / 又自然」被排成并列三条，意思反了）。"""
+    """并列的几样里混着一好一坏、或者中间有转过来的话 → 不算并列，拦下（11-14 试看：「显得生份 / 既体面 / 又自然」被排成并列三条，意思反了）。"""
     if k not in PARA or len(ws) < 2: return
     ps = sorted((span.find(norm(w)), norm(w)) for w in ws)
     for (i0, w0), (i1, w1) in zip(ps, ps[1:]):
@@ -500,7 +500,7 @@ def check_words(ws, lines, K):
     return good, bad
 
 
-# ───────────── 2.6 碎片：把半句话装进框里的，只看字面拦三种（11-15 夜量过以后加，试验夹；量法和数在 七\量碎片_记录.txt、七\盲判碎片_记录.txt） ─────────────
+# ───────────── 2.6 碎片：把半句话装进框里的，只看字面拦三种（11-15 夜量过以后加，试验夹；量法和数在 七\量碎片_记录.txt、七\检查碎片_记录.txt） ─────────────
 # 只拦得住碎片里的小头（量下来两成上下），拦得准；别的碎片要靠查意思那一问。不用分词，台式机上也是同一个结果。
 SUIPIAN = True                  # 开关。关掉以后把关和加这一段以前一模一样（第八份试题在台式机上跑的那份把关没有这一段，算它的数要关）
 SP_LINK = re.compile(r'^(?:然而|但是|可是|不过|所以|另外|而且|其实|那么|首先|其次|最后|接下来|再说|然后)')            # 整栏就是一句过渡话
@@ -555,7 +555,7 @@ def suipian(c, T):
             raise donghua.Bad(f'「{w}」带着「他、这、那、哪」这样的字，原话后面还连着「{tail[:10]}」，单看不知道在说谁、说什么：抄完整，或者换成说得清楚的词')
 
 
-# ───────────── 2.7 照起止取字（2026-11-22 总控令）：模型抄的字和字幕差一两个字，不再整处退回 ─────────────
+# ───────────── 2.7 照起止取字（2026-11-22 改）：模型抄的字和字幕差一两个字，不再整处退回 ─────────────
 # 第九份真答卷里，挑中的画面一半被退，多数是「不是这几句字幕里原样连着的字」：模型把「更好开的」抄成「更好的」、「AIA」抄成「AI」。
 # 办法：这一处画面本来就报了从第几句到第几句。哪一栏的字在这几句里找不到原样的，只认它写的头两个字和尾两个字，
 # 在这几句字幕里找「头两个字开头、尾两个字收尾」的那一截，上屏的字换成字幕里这一截原样的字。中间的字一律照字幕，不照模型写的。
@@ -693,7 +693,7 @@ def place(scenes, lines, T, dur, pro):
             if x['type'] == 'stat' and not x.get('second') and float(x.get('value') or 0) < 10 and str(x.get('unit') or '') in tuple('家个种条件位名次项点步类只台部'): x['type'] = 'say'; x.setdefault('icon', None)
         except (TypeError, ValueError): pass
     S0, S = S, []
-    for x in S0:                                               # 11-15 盲看：「15 到 644 岁」画成了刻度带；「将近 10%」的卡挂到了「原来经营的好了」上
+    for x in S0:                                               # 11-15 试看：「15 到 644 岁」画成了刻度带；「将近 10%」的卡挂到了「原来经营的好了」上
         if x['type'] == 'range' and AGE_UNIT.fullmatch(str(x.get('unit') or '')): x['type'] = 'say'; x.setdefault('icon', None)      # 岁数、年份的范围不画刻度带
         j = x['lb'] - 1
         if x['type'] == 'stat' and not x.get('second') and x.get('sub') and j > x['la'] and x['sub'][-1] == T[j] and CUTSUB.match(T[j]):   # 数字卡底下那行小字是换了说法的下一句：不挂，那句自己出
@@ -1016,7 +1016,7 @@ def bu_white():
     return sorted(icons())
 
 
-# 补图标那一问：第十份新题面（词最多 8 个字、栏名只许中文、「到」每条都写），11-17 总控定放行换进来
+# 补图标那一问：第十份新题面（词最多 8 个字、栏名只许中文、「到」每条都写），11-17 定放行换进来
 def bu_prompt(lines, seg=None):
     """lines：[{'开始', '句'}]（中转收到的样子）。seg=(a, b)：只补第 a+1 到第 b 句。"""
     N = len(lines); a, b = (0, N) if seg is None else (max(0, int(seg[0])), min(N, int(seg[1])))
@@ -1064,7 +1064,7 @@ def bu_parse(raw):
     return [x for x in (its or []) if isinstance(x, dict)]
 
 
-BU_SHORT = 8                    # 总控 11-17：补的词太长，取原话里紧挨的短词，最多这么多字；取不出来就只画图标
+BU_SHORT = 8                    # 11-17：补的词太长，取原话里紧挨的短词，最多这么多字；取不出来就只画图标
 BU_WORD_MOST = 10               # 图标词的词最多几个字（和把关 check_all 里那条同一个数）
 _BU_TURN = ('但是', '可是', '不过', '然而', '反而', '但', '却')
 _BU_CAUSE = ('所以', '因此', '因而', '于是', '结果', '导致', '使得')
@@ -1098,7 +1098,7 @@ def bu_check(items, lines, K, white=None, sp=None):
     for x in (items if isinstance(items, list) else [])[:n]:
         if not isinstance(x, dict): continue
         a = {'类型': '图标词', '从': x.get('从', x.get('from')), '到': x.get('到', x.get('to')), '图标': x.get('图标', x.get('icon')), '词': x.get('词', x.get('word'))}      # 栏名写成英文 from、to、icon、word 的也认（第九份购物稿两遍里有 41 处）
-        if a['到'] is None and isinstance(a['从'], int) and not isinstance(a['从'], bool): a['到'] = a['从']      # 总控 11-17：没写盖到第几句的，当只盖一句
+        if a['到'] is None and isinstance(a['从'], int) and not isinstance(a['从'], bool): a['到'] = a['从']      # 11-17：没写盖到第几句的，当只盖一句
         try: f, t = int(a['从']), int(a['到'])
         except (TypeError, ValueError, OverflowError): held.append(dict(项=a, 原因='「从」「到」写得不对', 道='补图标')); continue
         why = ''
@@ -1108,7 +1108,7 @@ def bu_check(items, lines, K, white=None, sp=None):
         if why: held.append(dict(项=a, 原因=why, 道='补图标')); continue
         if a['词'] == '': good.append(_bu_bare(a, lines, f, t)); continue      # 中转那头已经定了只画图标的（软件这头再把一遍关时认它）
         long = isinstance(a['词'], str) and len(norm(a['词'])) > BU_WORD_MOST
-        if long:                                         # 总控 11-17：词太长不再整张扔掉。图标照画，大字换成原话里紧挨的短词；取不出来就只画图标
+        if long:                                         # 11-17：词太长不再整张扔掉。图标照画，大字换成原话里紧挨的短词；取不出来就只画图标
             sw = bu_short(a['词']); g = check_all([dict(a, 词=sw)], lines, K, sp)[0] if sw else []
             if g and g[0]['args'][1][-1:] not in HALF: g[0]['项'] = a
             else:
@@ -1161,7 +1161,7 @@ def bu_check_prompt(T, good):
 
 
 def bu_verdict(raw, n):
-    """查补的图标的回话 → 去掉哪几个号（判对不上的，加上读不出来的）。总控 11-17：回话读不出来的那几处一律当没查过，不进片子，哪一档都一样。
+    """查补的图标的回话 → 去掉哪几个号（判对不上的，加上读不出来的）。11-17：回话读不出来的那几处一律当没查过，不进片子，哪一档都一样。
     只认「"对得上": true / false」（是、否也认）；写成「对不上」的、值认不得的、缺的号，都算读不出来。一个号都读不出来回 None（好重叫）。"""
     parts = re.split(r'"号"\s*:\s*"?(\d+)"?', str(raw or '')); ok = {}
     for i in range(1, len(parts) - 1, 2):

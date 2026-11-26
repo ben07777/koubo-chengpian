@@ -10,7 +10,7 @@ sys.path.insert(0, str(APP))
 import asr, cut, planner, render, bgm, person, juben, xieshou, yangzi  # noqa: E402
 import native
 
-THEMES = {'夜幕': 'night', '白纸': 'paper2', '方格本': 'grid'}   # 11-12 夜他定发三套：夜、白纸（改色后，方案第六节）、方格本；薄荷、墨底宋体不发，选不到（老片子记着薄荷的，照夜出）
+THEMES = {'夜幕': 'night', '白纸': 'paper2', '方格本': 'grid'}   # 11-12 夜定发三套：夜、白纸（改色后，方案第六节）、方格本；薄荷、墨底宋体不发，选不到（老片子记着薄荷的，照夜出）
 STEPS = ['听写', '剪气口', '定画面', '配乐', '画画面', '合成', '封面']
 MIN_SEC, MAX_SEC = 3, 600  # 录音最短 3 秒，最长 10 分钟
 
@@ -132,7 +132,7 @@ class Job:
                 self.mark('剪气口' if trim else '听写', 8, f'字幕识别完成，共 {len(lines)} 句')
                 if keep_person and not person.has_video(src, render.ffmpeg()):
                     keep_person = False; self.mark('听写', None, '这个文件只有声音没有画面，将生成纯动效版')
-                if proof and use_ai and not keep_person and xieshou.relay_url():   # 有人出镜的不叫云端（11-18），也就不用停下等改字   # 专业版（11-15 总控令）：云端配画面排在改完错字之后。字幕认出来先停在这里，用户看一眼错字、点「开始出片」（走重出那条路）才叫云端；没开云端的不停
+                if proof and use_ai and not keep_person and xieshou.relay_url():   # 有人出镜的不叫云端（11-18），也就不用停下等改字   # 专业版（11-15 改）：云端配画面排在改完错字之后。字幕认出来先停在这里，用户看一眼错字、点「开始出片」（走重出那条路）才叫云端；没开云端的不停
                     self.s.update(lines=[''.join(c[0] for c in l['cs']) for l in lines], title=[], person=bool(keep_person), use_ai=True, focus=focus, shows=None, scenes=[], wait_proof=True)
                     self.s['trial'] = xieshou.trial_info() or None
                     self.mark('听写', 9, '字幕认出来了。先看一眼有没有错字，改好点「开始出片」')
@@ -156,10 +156,10 @@ class Job:
                 self.s['cover_t'] = pmeta['cover_t']
             self.mark('定画面', 15)
             self.s['use_ai'] = bool(use_ai)
-            ai = bool(use_ai) and not pmeta   # 11-18 总控定：有人出镜的录像只用字幕和时间、重点词在本机挑，云端排的用不上，所以不叫云端、不扣条数（试用也不扣）。开关照用户点的记着
+            ai = bool(use_ai) and not pmeta   # 11-18 定：有人出镜的录像只用字幕和时间、重点词在本机挑，云端排的用不上，所以不叫云端、不扣条数（试用也不扣）。开关照用户点的记着
             rec = xieshou.recording_id(next(iter(sorted(d.glob('原素材.*'))), None))   # 这条录音的记号：按录音文件算，改字、换画风、重新导入都一样，云端按它记条数
             raw = d / '剧本_写手原稿.json'          # 写手原样交的剧本（还没套用户的修改）。重出时字幕没改、写手没换就接着用它，
-            jb = None                               # AI 不会重新排出一套不同的词，用户第一轮改的才对得上（第 5 步盲审）
+            jb = None                               # AI 不会重新排出一套不同的词，用户第一轮改的才对得上（第 5 步检查）
             if raw.exists():
                 try:
                     old = juben.load(raw)

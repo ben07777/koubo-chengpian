@@ -1,6 +1,6 @@
 
 // ===== 专业版·版式（2026-11-15 从试验夹搬入）：专业版的版面。只有专业版的片子才接上，免费版不走这里。=====
-// 他定的上线的线是「体面、说得过去、不坑人」。总控看两段市场参照后点的三样基本功，这里补：
+// 上线的线是「体面、说得过去、不坑人」。看过两段市场参照后点的三样基本功，这里补：
 // 1 左上角：原来那行灰字是第一句硬截的半句话，不出了。换成「第几段 / 共几段」+ 这一段的短题 + 分段进度条。
 //   短题只用模型填的「标题」卡的大字（字幕里原样的字）；这一段没有标题卡就只出段号，绝不自己截半句。
 // 2 舞台放大 1.15 倍、往下放，字幕跟着下移；最底下那一条（1540 以下）平台会盖上作者名和文案，不放要紧的字，只放一个淡淡的大段号和底色的图形。
@@ -97,7 +97,7 @@ if (typeof xhFit === 'function') proText = function (parent, s, w, h, cap, color
   d.dataset.w = s; best.ls.forEach((l, i) => { if (i) d.appendChild(document.createElement('br')); d.appendChild(document.createTextNode(l)); });
   return box;
 };
-// 「比多少、几组对比」：名字说完要等一阵才到数的，柱子先慢慢垫到三成半，数到了再长满，不让中间空着等（盲看：28.8% 之前空了两秒）
+// 「比多少、几组对比」：名字说完要等一阵才到数的，柱子先慢慢垫到三成半，数到了再长满，不让中间空着等（试看：28.8% 之前空了两秒）
 PRO._stacks = function (sc) {
   const R = sc.rows, n = R.length, sp = n === 2 ? 380 : 770 / n, w = Math.min(250, sp - 50), M = 50, TH = 8, BASE = 690;
   const mx = Math.max(...R.map(r => r.num.val)), tail = PRO_TAIL[sc.kind];
@@ -120,7 +120,7 @@ PRO._stacks = function (sc) {
     });
   };
 };
-// 「占多少」：数旁边那行「是什么的」原来硬挤成一行，字很小；放得开就折成两行放大（盲看：手机上看不清）
+// 「占多少」：数旁边那行「是什么的」原来硬挤成一行，字很小；放得开就折成两行放大（试看：手机上看不清）
 { const f0 = PRO['占多少']; PRO['占多少'] = sc => {
   const upd = f0(sc);
   if (sc.what) { const d = [...sc.el.querySelectorAll('.big')].find(e => e.textContent === sc.what.text), best = d && xhFit(sc.what.text, 340, 180, 76);
@@ -146,7 +146,7 @@ for (const k of Object.keys(PRO)) { const f0 = PRO[k]; PRO[k] = sc => { const up
   const pp = sc.el.lastElementChild, H = 470, h0 = 132, y0 = 170;
   return t => { upd(t); const g = P(t, T - 0.36, T - 0.06, E.outC), h = h0 + (H - h0) * g; pp.style.height = h.toFixed(1) + 'px'; pp.style.top = (y0 + (H - h) / 2).toFixed(1) + 'px'; pp.style.overflow = g < 1 ? 'hidden' : 'visible'; };
 }; }
-// ---- 没有画面的句子：一屏一句（11-15 总控令）。整句一次出来，位置和字号固定，只强调一个词；不逐字打。----
+// ---- 没有画面的句子：一屏一句（11-15 改）。整句一次出来，位置和字号固定，只强调一个词；不逐字打。----
 // 上屏的字去掉语气词（只删不加，数字和否定词不动）；半句话照停顿拼成整句；按词折行，一屏最多三行，放不下拆成两屏。
 // 带着免费版小动画记号（tpl）的句卡不动，照免费版画。
 const BAN_F = 100, BAN_CY = 450, BAN_W = 900;        // 字号、块的中心高度、块宽

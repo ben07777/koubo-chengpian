@@ -13,7 +13,7 @@ from pathlib import Path
 APP = Path(__file__).resolve().parent
 HOME = APP / '样子'
 LOOKS = ('象形', '全息')                                         # 加第三种：在这里添一个名字，app/样子/ 下放它的夹子，下面 PIN 里添它怎么拼页面
-DEFAULT = '全息'                                                 # 总控 2026-11-16 夜：默认改成全息（此前定象形，理由是怕全息出片慢；软件里实测两套都两分半；两个盲看的人都说全息更像花钱买的东西）。修改页照样两种都能选
+DEFAULT = '全息'                                                 # 2026-11-16 夜：默认改成全息（此前定象形，理由是怕全息出片慢；软件里实测两套都两分半；两个试看的人都说全息更像花钱买的东西）。修改页照样两种都能选
 NAMES = {'象形': '象形图形', '全息': '全息'}
 CAP_KBPS = {'全息': 4000}                                        # 压片封顶（每秒多少千比特）。全息底上细线多，不封顶一条两分半的片 100 多兆；封到 4 兆每秒约 70 兆。免费版和象形不封
 
@@ -48,20 +48,24 @@ def chip_of(s):
 # ───────── 台上的大字：没配上画面的句子，把这句里的一个名字、名词短语或数放大摆在台上 ─────────
 # 规矩（每一条都能拿出片后的大字清单逐个对）：
 #   一、只从这句字幕里原样取连着的字，不编字，不拼两句。
-#   二、这句本身是半句就不摆：句尾（去掉「呢、啊」这类语气字）是「的、得、就、是、在、用、去、本来、觉得、以后」这类接不完的字；
-#       句首是「的、得、了、着」这类接上一句的字；上一句是这样断开的，这一句是它的后半句：都不摆。
+#   二、这句本身是半句：句尾（去掉「呢、啊」这类语气字）是「的、得、就、是、在、用、去、本来、觉得、以后」这类接不完的字；
+#       句首是「的、得、了、着」这类接上一句的字；上一句是这样断开的，这一句是它的后半句。半句里只摆够整的三样：
+#       两个字以上的名字（人名、地名、机构名、外文名）、带数字的数、三个字以上的名词短语（「个人能力」「处方粮」）。别的都空着。
 #   三、只摆名字、名词短语、数。词里有动词、副词、介词、连词、代词、语气字的不摆；词尾是形容词、「里、上、头」这类方位字的不摆。
 #       开头的「叫、在、从、那、这、对、用、再说、根据」这类字先去掉再看。数前头的「大约、将近、超过」照留。
 #   四、名词短语要整：词后面紧跟着还是名词（「同一个AI」后面是「商业助手」），接上；接上超过 8 个字，从前头去掉「同一个」这类修饰；还不行就不摆。
 #   五、数和否定照上屏词那道关：不从一个数中间截，同一小句有「不、没」就得带上。
-#   六、台上连着摆大字最多三个，第四个空着，空过再数。中间有画面或空着的句子，从头数。
+#   六、台上连着摆大字最多三个，第四个空着，空过再数。中间有画面或空着的句子，从头数。第四个是数、前头三个里有不是数的，空掉最前头那个不是数的，让数留下。
 #   挑不出来就空着。空一两秒不算毛病，乱挑才算。
-# 词先用云端给这句挑的上屏词，再用本机挑的词，最后看整句（8 个字以内）。切词用软件自带的 jieba，只查词性，不往它的词典里加词（免费版也用它切词）。
+#   七、上面挑不出，再从整句里找连着的名词：先找名字，再找数，再找三个字以上的名词短语。光两个字的普通名词（「事情」「机构」）不摆；
+#       名词前头紧贴着一个单字（「新京报」被切成「新」「京报」），或者头一个就是单字（「到价下单」里的「价下单」），怕是截了半截，不摆。
+#       「大家」这类禁用词不连进去；数后头紧跟着「左右、上下、多」照带上。
+# 词先用云端给这句挑的上屏词，再用本机挑的词，再看整句（8 个字以内），最后照规矩七从整句里找。切词用软件自带的 jieba，只查词性，不往它的词典里加词（免费版也用它切词）。
 # 一开口就出，说完留着，最多留到说完后 1.2 秒或下一句开口。
 BIG_MOST = 8
 BIG_HOLD = 1.2
 BIG_RUN = 3
-BIG_NO = re.compile(r'^(这个|那个|这些|那些|我们|你们|他们|什么|怎么|一个|就是|所以|但是|可是|因为|然后|其实|可能|已经|好像|如果|还是|或者|而且|以及|的话|时候|这样|那样|自己|大家|来说|一旦|看起来|起来|一期|一句|一下|这么|那么|这里|那里|这种|那种|有点|还有|知道|事儿|东西|今天|现在|一样|一点|一些|不是|没有|而是|结果|AI|ai)$')
+BIG_NO = re.compile(r'^(这个|那个|这些|那些|我们|你们|他们|什么|怎么|一个|就是|所以|但是|可是|因为|然后|其实|可能|已经|好像|如果|还是|或者|而且|以及|的话|时候|这样|那样|自己|大家|来说|一旦|看起来|起来|一期|一句|一下|这么|那么|这里|那里|这种|那种|有点|还有|知道|事儿|东西|今天|现在|一样|一点|一些|不是|没有|而是|结果|全世界|AI|ai)$')
 BIG_TAIL = '呢啊呀吧嘛哦哈啦么诶'
 BIG_HEAD = '的得地了着'                                         # 句首是这几个字，是接着上一句说的后半句
 BIG_HALF = re.compile(r'(的|得|地|就|是|把|被|让|给|在|从|和|跟|与|对|用|去|到|而|但|才|都|也|还|又|再|更|很|最|太|离|成|本来|原来|如果|因为|所以|但是|可是|而且|然后|觉得|认为|以后|之后|的话)$')
@@ -70,6 +74,10 @@ BIG_NOUN = {'n', 'nr', 'nrt', 'nrfg', 'ns', 'nt', 'nz', 'ng', 'eng'}
 BIG_BAD = {'v', 'vd', 'vg', 'vn', 'vi', 'l', 'i', 'd', 'c', 'p', 'u', 'uj', 'ul', 'ud', 'uv', 'uz', 'ug', 'y', 'e', 'o', 'r', 'zg'}
 BIG_QUAL = {'大约', '约', '将近', '近', '超过', '不到', '差不多', '至少', '最多'}
 BIG_END_NO = '里上下中内外前后边头面时'
+BIG_NAME = {'nr', 'nrt', 'nrfg', 'ns', 'nt', 'nz', 'eng'}
+BIG_ONE = {'a', 'b', 'n', 'ng', 'j', 'nr', 'ns', 'nt', 'nz', 'vn'}        # 名词前头紧贴着这类单字，怕是名字的半截
+BIG_ABOUT = ('左右', '上下', '多', '余', '来')                             # 数后头这几个字照带上，丢了数就说死了
+BIG_DATE = ('月', '日', '号', '点', '时', '月份', '点钟')
 BIG_FIX = {'拉平': 'v', '问': 'v', '过生日': 'v', '微软': 'nt', '发达': 'a', '清单': 'n', '有点': 'd', '多少': 'r', '人家': 'r', '专门': 'd'}      # jieba 词典里标错的词，只在这里改口
 
 
@@ -129,15 +137,40 @@ def _big_word(w, text, nxt):
     return w, i
 
 
+def _scan(text):
+    """规矩七：从整句里找连着的名词，回候选词，名字在前、数其次、名词短语最后，同一样里长的在前。"""
+    t = _toks(text); out = []; k = 0
+    while k < len(t):
+        x, f = t[k]
+        if not (f in BIG_NOUN or (f == 'm' and re.search(r'\d', x))): k += 1; continue
+        j = k + 1
+        while j < len(t) and not BIG_NO.match(t[j][0]):
+            d = re.search(r'\d', ''.join(y for y, _ in t[k:j]))
+            if t[j][1] in BIG_NOUN or t[j][1] in ('k', 'q') or (t[j][1] == 'm' and (d or re.search(r'\d', t[j][0]))) or (d and t[j][0] in ('.', '%', '％')): j += 1
+            else: break
+        if j < len(t) and t[j][0] in BIG_ABOUT and any(re.search(r'\d', y) for y, _ in t[k:j]): j += 1
+        w = ''.join(y for y, _ in t[k:j])
+        cut = (k > 0 and len(t[k - 1][0]) == 1 and t[k - 1][1] in BIG_ONE) or (len(x) == 1 and not x.isdigit()) or BIG_NO.match(x)
+        cut = cut or (re.search(r'\d', w) and w.endswith(BIG_DATE) and not w.endswith('小时'))                # 几月、几号、几点是日子，不当数摆
+        if not cut:
+            if any(g in BIG_NAME and len(y) >= 2 and not BIG_NO.match(y) for y, g in t[k:j]): out.append((0, -len(w), w))
+            elif re.search(r'\d', w): out.append((1, -len(w), w))
+            elif len(w) >= 3: out.append((2, -len(w), w))
+        k = j
+    return [w for _, _, w in sorted(out)]
+
+
 def big_of(l, nxt='', prev=''):
     """这一句摆上台的那个词，和说到它的秒：回 (词, 秒) 或 (None, None)。nxt、prev 是下一句、上一句的字。"""
     if l.get('person'): return None, None
     text = str(l.get('text') or '')
-    if big_half(text) or big_half(prev): return None, None
+    half = big_half(text) or big_half(prev)
     try:
-        for c in (l.get('word'), l.get('kw'), text.strip().rstrip(BIG_TAIL)):
+        cands = _scan(text) if half else [l.get('word'), l.get('kw'), text.strip().rstrip(BIG_TAIL)] + _scan(text)
+        for c in cands:
             w, i = _big_word(c, text, nxt)
             if not w: continue
+            if half and not (re.search(r'\d', w) or len(w) >= 3 or any(g in BIG_NAME and len(y) >= 2 for y, g in _toks(w))): continue
             p = 0
             for g in l.get('cs') or []:                            # 一格可能不止一个字：数到第 i 个字落在哪一格
                 if p + len(g[0]) > i: return w, round(float(g[1]), 3)
@@ -173,19 +206,22 @@ def content_of(jb):
     fp = _fp(lines, pics)                                          # 指纹照点掉以前的算：点掉一张，别的画面的进场、摆法不跟着重排
     pics = [p for p in pics if p['签'] and not _hidden(hide.get(p['签'][0], []), p['签'][1])]      # 修改页点掉的不画；登记不了的也不画（字卡那套也是这样）
     for k, p in enumerate(pics, 1): p['号'] = k
-    run = 0                                                        # 规矩六：台上连着摆的大字最多三个，第四个空着
+    run = []                                                       # 规矩六：台上连着摆的大字最多三个，第四个空着；第四个是数，让它留下
+    num = lambda x: bool(re.search(r'\d', x['big']))
     for x in lines:
         if x.get('big') and _bare(x, pics):
-            if run >= BIG_RUN:
-                for key in ('big', 'bt', 'be'): x.pop(key, None)
-                run = 0
-            else: run += 1
-        else: run = 0
+            if len(run) >= BIG_RUN:
+                k = next((k for k, y in enumerate(run) if not num(y)), None) if num(x) else None
+                gone = x if k is None else run[k]
+                for key in ('big', 'bt', 'be'): gone.pop(key, None)
+                run = [] if k is None else run[k + 1:] + [x]
+            else: run.append(x)
+        else: run = []
     return dict(时长=jb['dur'], 指纹=fp, 话题=jb.get('topics') or [], 句子=lines, 画面=pics)
 
 
-# ───────── 本机兜底（总控 2026-11-18 定）：云端给得少，本机给句子配「立体图标加词」 ─────────
-# 他在台式机出的一条：三句十秒，云端只配了一张纯字的标题卡。他原话「全是字儿，没有图案或动画」，放大的数在他眼里也是字。
+# ───────── 本机兜底（2026-11-18 定）：云端给得少，本机给句子配「立体图标加词」 ─────────
+# 实测出的一条：三句十秒，云端只配了一张纯字的标题卡，看着全是字，没有图案；放大的数看着也是字。
 # 所以本机补的一律是图标词（全息那套是转着的线框立体图标）：
 #   带数的句子：图标加那个数（「负18度」带上负）；年份、几月几号几点、汉字写的数、光数没单位的，不当数用。
 #   图标怎么挑：先看这句里有没有下面这张表里的东西（电费配闪电、冷冻室配温度计、片子配摄像机）；再看免费版那张收紧过的表（切词后整个词对上才算）；
@@ -230,7 +266,7 @@ def _num_of(l):
 def _icon_of(l, num=None):
     """回 (图标, 撞上的词)；挑不到回 None。"""
     text = l['text']
-    if num and re.search('(分钟|小时|秒)$', num) and 'timer' in white(): return 'timer', None      # 说的是要多久：配计时器（「做一条片子要3到5分钟」配摄像机，盲看读成「视频长3到5分钟」）
+    if num and re.search('(分钟|小时|秒)$', num) and 'timer' in white(): return 'timer', None      # 说的是要多久：配计时器（「做一条片子要3到5分钟」配摄像机，试看读成「视频长3到5分钟」）
     for rx, name in _THINGS:
         m = rx.search(text)
         if m and name in white(): return name, m.group(0)
@@ -272,7 +308,7 @@ def load_style(name):
 
 
 # ───────── 兜底：这套样子不会画的画面，落到哪种 ─────────
-# 总控 2026-11-16 定：不会画的统一落回这套样子的「图标加词」。先看有没有意思不走样的落法（流程、连锁、循环落成单子，字一个不少）；没有的落回图标加词。
+# 2026-11-16 定：不会画的统一落回这套样子的「图标加词」。先看有没有意思不走样的落法（流程、连锁、循环落成单子，字一个不少）；没有的落回图标加词。
 # 图标：云端在这张画面上填了图标就用它填的；没填的，每一种配一只固定的中性图标。词：这一种最要紧的那一栏，原样，一个字不改。
 NEUTRAL = {'标题': 'flag', '引话': 'message-circle', '亮出大数': 'chart-column', '占多少': 'chart-pie', '比多少': 'chart-column', '时间先后': 'clock', '并排对照': 'layers',
            '因果': 'arrow-right', '前后变化': 'arrow-right', '转折': 'flag', '问答': 'circle-question-mark', '不是': 'circle-check', '天平': 'scale', '拉开': 'chart-line',
@@ -380,7 +416,7 @@ def fields(kind, fill):
         elif kind == '问答': bl = [dict(body=_T(d['问']), icon=_ic('circle-question-mark')), dict(body=_T(d['答']), icon=_ic(d.get('答的')))]
         elif kind == '配上': bl = [dict(body=_T(d[k]['词']), icon=_ic(d[k].get('图标'))) for k in ('左', '右')]; foot = d.get('合') or None
         else: bl = [dict(body=_T(d['A'])), dict(body=_T(d['B']))]
-        if kind == '前后变化':                                     # 总控 11-16 夜：两块上永远带「以前」「现在」两个小字（盲看有人把前后读成了因果）
+        if kind == '前后变化':                                     # 11-16 夜：两块上永远带「以前」「现在」两个小字（试看有人把前后读成了因果）
             for b, w in zip(bl, ('以前', '现在')): b['head'] = dict(t=w, at=b['body']['at'], br=None)
         if not 2 <= len(bl) <= 4 or not all(b['body']['t'] for b in bl): raise ValueError(kind)
         return dict(blocks=bl, link=PAIR_LINK[kind], foot=foot)
@@ -404,7 +440,7 @@ def fields(kind, fill):
 
 # ───────── 排：每张画面从第几秒到第几秒、哪种进场、哪套色 ─────────
 GAP_JOIN, EARLY, IDLE_LEAD = 2.5, 1.5, 0.6      # 两张隔得不到 2.5 秒就接上；后一张最多提前 1.5 秒进场；隔得远的中间只出底和字幕，后一张提前 0.6 秒进场
-LEAD_MOST = 30.0                                # 11-18 加：第一张前头还有它没盖着的句子，就不提前，按它自己那句出（他那条：标题卡盖着前两句从 0 秒打字）。总控 11-16 夜：开头空着超过一秒，第一张提前到第 0 秒出（买家第一眼别以为软件没干活）。第一张晚过半分钟的就不算「开头」了，不提前，免得一张画面挂半分钟讲别的事
+LEAD_MOST = 30.0                                # 11-18 加：第一张前头还有它没盖着的句子，就不提前，按它自己那句出（实测那条：标题卡盖着前两句从 0 秒打字）。11-16 夜：开头空着超过一秒，第一张提前到第 0 秒出（买家第一眼别以为软件没干活）。第一张晚过半分钟的就不算「开头」了，不提前，免得一张画面挂半分钟讲别的事
 
 
 def bag(seed, n, K, salt=0):
@@ -415,6 +451,27 @@ def bag(seed, n, K, salt=0):
         if out and K > 1 and a[0] == out[-1]: a[0], a[1] = a[1], a[0]
         out += a
     return out[:n]
+
+
+BORROW_MOST = 0.4                               # 1.4.2：一张画面只差一点不够这套样子最短秒，先向挨着的前一张、后一张借，各最多借 0.4 秒，借了对方也不能短过它自己的最短秒；借不够再丢
+
+
+def borrow(shots, mins):
+    """挨着的两张画面之间挪边界，给不够最短秒的那张补时间。只挪两张真画面之间的边，不碰空着的那段。"""
+    for i, s in enumerate(shots):
+        if s['kind'] == 'none': continue
+        lack = mins.get(s['kind'], 0) - (s['b'] - s['a'])
+        if lack <= 1e-6: continue
+        for j, side in ((i - 1, 'a'), (i + 1, 'b')):
+            if lack <= 1e-6 or not (0 <= j < len(shots)): continue
+            o = shots[j]
+            if o['kind'] == 'none': continue
+            spare = (o['b'] - o['a']) - mins.get(o['kind'], 0)
+            x = min(lack, BORROW_MOST, spare)
+            if x <= 0.01: continue
+            if side == 'a' and abs(o['b'] - s['a']) < 1e-6: s['a'] = o['b'] = round(s['a'] - x, 3); lack -= x
+            elif side == 'b' and abs(s['b'] - o['a']) < 1e-6: s['b'] = o['a'] = round(s['b'] + x, 3); lack -= x
+    return shots
 
 
 def timeline(drawn, T0, T1, pal0, head=None, need=None):
@@ -437,13 +494,13 @@ def timeline(drawn, T0, T1, pal0, head=None, need=None):
     return shots
 
 
-# ───────── 本机再拦一道（总控 2026-11-16 夜定）：只用规矩判，不叫通义；宁可少拦也别错拦 ─────────
+# ───────── 本机再拦一道（2026-11-16 夜定）：只用规矩判，不叫通义；宁可少拦也别错拦 ─────────
 # 转折、因果：两块出自同一句（同一行字幕或挨着的两行），那几行里又没有转折词、因果词，就不许画成两块加箭头，照兜底落回图标加词。
 # 问答：问的那块没有问的样子，或者答的那块在原话里排在问的前面，就不画成问答，照兜底落回图标加词。
 # 并排对照：有一边的小标题不是原话里挨着正文的字（中间隔了六个字以上，或者压根找不到），两边的小标题都去掉，只画正文。
 # 引话：出处超过 8 个字，不画出处，只画那句话。
 # 大数没填说的是什么：照画，不拦。
-# 单子、流程、连锁（总控 11-17 夜）：各格出自同一句话就不画成清单（「优势持续 / 几年十几年 / 变成什么样」读不通）。字幕行里没有断句记号，所以这样判：
+# 单子、流程、连锁（11-17 夜）：各格出自同一句话就不画成清单（「优势持续 / 几年十几年 / 变成什么样」读不通）。字幕行里没有断句记号，所以这样判：
 #   有一格跨了两行字幕，或者两格落在同一行字幕里，就算同一句切出来的；各格各占一行的（「早点发现 / 排查 / 安排检修」）照画。格里的字在原话里找不到原样的（改写过），判不了，不拦。
 #   拦下的落回图标加词（单子有题目用题目），落不了就只出字幕。
 TURN_W = ('但', '可', '却', '不过', '其实', '然而', '只是', '反而', '反倒', '偏偏', '没想到', '谁知')
@@ -511,11 +568,11 @@ def guard(kind, fill, lines, la, lb):
     return None
 
 
-# ───────── 屏上的字再过一道（总控 11-16 夜定，本机规矩，不叫通义）─────────
+# ───────── 屏上的字再过一道（11-16 夜定，本机规矩，不叫通义）─────────
 # 一、大字、小标题、图标旁边的词里的语气词（啊、呢、吧、呀、哎、嘛、哦、嗯）去掉；去完不成话（剩不到两个字）就不画这张。
 # 二、原话那句带否定或辟谣的字，截出来上屏的字没带上，不画这张（「不是 A」截成「A」，意思就反了）。
 # 三、上屏的字里有治好、治愈、根治、包治、特效、保证这类字，一律不画（像医疗宣称）。补的图标词也走这三条。
-#     11-17 夜总控加：这张画面盖到的原话里带这类字（再加降血糖、抗癌），也一律不画（「听说玉石床垫能治好糖尿病」配医院图标加「糖尿病」，单截一帧像在宣称疗效）。
+#     11-17 夜加：这张画面盖到的原话里带这类字（再加降血糖、抗癌），也一律不画（「听说玉石床垫能治好糖尿病」配医院图标加「糖尿病」，单截一帧像在宣称疗效）。
 QI_W = '啊呢吧呀哎嘛哦嗯'
 QI_KEEP = ('酒吧', '网吧', '贴吧', '吧台', '干嘛', '呢子', '呢绒')      # 这几个词里的字不是语气词
 NEG_W = ('不', '没', '别', '未', '虚假', '谣言', '辟谣', '骗', '假的', '忽悠', '智商税')
@@ -578,7 +635,7 @@ def screen_check(fill_raw, fill, lines, la, lb):
 def plan(content, style):
     """回 (给页面的 DATA, 每张画面落到了哪儿的清单, 这条片的几个数)。先只排云端的；排完哪几句没被画面盖着，再把本机给这几句备的加进去重排一遍。"""
     cloud = [p for p in content['画面'] if not p.get('本机')]; mine = [p for p in content['画面'] if p.get('本机')]
-    if content['时长'] <= SHORT_SEC:                             # 短录音：云端的纯字画面，盖着的句子本机都配得上图标，就换成图标（他：「全是字儿，没有图案」）
+    if content['时长'] <= SHORT_SEC:                             # 短录音：云端的纯字画面，盖着的句子本机都配得上图标，就换成图标（实测那条看着全是字，没有图案）
         has = {p['la'] for p in mine}
         cloud = [p for p in cloud if not (p['种'] in TEXT_ONLY and all(i in has for i in range(p['la'], max(p['lb'], p['la'] + 1))))]
     out = _plan(dict(content, 画面=cloud), style)
@@ -616,8 +673,9 @@ def _plan(content, style):
                 f.update(kind=can[kind], k=k, pal=pals[topic(p['la']) % len(pals)], t0=p['t0'], t1=p['t1'], hand=False, early=True, together=together)
                 drawn.append(f); las[k] = p['la']
         report.append(row)
-    while True:                                                  # 这套样子嫌太短、画不完进场的：先丢补的、再丢最短的，一次丢一张，丢完重排
+    while True:                                                  # 这套样子嫌太短、画不完进场的：先向挨着的借时间（borrow），借不够再丢；先丢补的、再丢最短的，一次丢一张，丢完重排
         shots = timeline(drawn, 0.0, dur, pals[0], head=lambda d: las.get(d['k'], 0) == 0, need=lambda d: mins.get(d['kind'], 0) + 0.02 if report[d['k'] - 1]['本机补的'] else 0)
+        borrow(shots, mins)
         short = [s for s in shots if s['kind'] != 'none' and s['b'] - s['a'] < mins.get(s['kind'], 0) - 1e-6]
         if not short: break
         s = min(short, key=lambda s: (not (report[s['k'] - 1]['补的'] or report[s['k'] - 1]['本机补的']), s['b'] - s['a'])); drawn = [d for d in drawn if d['k'] != s['k']]
@@ -660,7 +718,7 @@ def _pin_pic(data):
     for old, new in (('const W = 1920, H = 1080;', 'const W = window.PIC_W || 1920, H = window.PIC_H || 1080;'), ('const CELL = 180;', 'const CELL = window.PIC_CELL || 180;')):
         if eng.count(old) != 1: raise RuntimeError('象形样子的脚本对不上，请把软件重新解压一次。')
         eng = eng.replace(old, new)
-    opt = dict(zh='软件', list='竖', blur=True, hudText=False)      # 总控 11-16 定：竖排、软件现有的中文字体、运动模糊开着、角上不出字
+    opt = dict(zh='软件', list='竖', blur=True, hudText=False)      # 11-16 定：竖排、软件现有的中文字体、运动模糊开着、角上不出字
     faces = face('Inter Tight', '/yz/InterTightwght.ttf', '100 900') + face('DM Mono', '/yz/DMMono-Medium.ttf', '500') + face('NotoSC', '/fonts/NotoSansSC-VF.ttf', '100 900')
     html = f'''<!doctype html><html><head><meta charset="utf-8"><style>{faces} html,body{{margin:0;background:#000;overflow:hidden}} canvas{{display:block}}</style></head><body>
 <canvas id="c" width="1080" height="1920"></canvas>

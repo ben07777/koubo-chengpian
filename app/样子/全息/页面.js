@@ -70,7 +70,7 @@ function when(word, from = 0) {                        // 这几个字是第几�
   for (const l of LINES) { if (l.t1 < from) continue; const i = l.text.indexOf(word); if (i >= 0 && l.cs[i]) return l.cs[i][1]; }
   return null;
 }
-function cells(text, k, frame, x, y, size, o = {}) {   // 一格一个字，从左往右一个个扫出来（总控 11-16 夜：不再先跳字母符号，买的人会当成乱码出错）
+function cells(text, k, frame, x, y, size, o = {}) {   // 一格一个字，从左往右一个个扫出来（11-16 夜：不再先跳字母符号，买的人会当成乱码出错）
   ctx.font = `${o.weight || 700} ${size}px ${CN}`;
   const n = text.length, advs = [...text].map(ch => /[ -~]/.test(ch) ? Math.max(size * 0.34, ctx.measureText(ch).width + size * 0.07) : size * 1.04), w = advs.reduce((p, q) => p + q, 0), x0 = o.align === 'center' ? x - w / 2 : x, a = o.alpha ?? 1; let cx = x0;
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
@@ -168,7 +168,7 @@ function sceneIcon(S) {
 function sceneStack(S) {
   const n = S.rows.length, m = stackModel(n), ts = []; let from = S.a - 0.3;
   for (const r of S.rows) { const w = when(r, from) ?? (ts.length ? ts[ts.length - 1] + 1 : S.a + 0.5); ts.push(Math.max(S.lead && !ts.length ? S.a + 0.35 : w, S.a + 0.35)); from = w; }
-  const tm = 1e9;      // 总控 11-16 夜：不再并成一块（并完字先撤，只剩一摞方块挂两三秒，盲看的人看不懂）；字和方块一直留到这张收场，一起走
+  const tm = 1e9;      // 11-16 夜：不再并成一块（并完字先撤，只剩一摞方块挂两三秒，试看的人看不懂）；字和方块一直留到这张收场，一起走
   return t => {
     const cam = camOf(t, { cx: lerp(292, 540, eio(P(t, tm + 0.28, tm + 0.82))), cy: 770, dist: 7.96, ty: 1.0 * m.kf, pitch: 0.26 }), frame = Math.floor(t * 24), out = P(t, S.b - 0.38, S.b - 0.02), A = 1 - out;
     stage(t, cam, { top: 2.12 * m.kf, padK: 1.7 });
@@ -282,7 +282,7 @@ function sceneTitle(S) {
 
 // ───────── 这一段的排法（照第八份候选甲的真答卷：三张小画面的起止、图标、字都是通义填的；数那一样是照原话手加的，答卷里没配） ─────────
 // 没配上画面的那几句：只有底盘、光柱在转（还有角上的小读数和字幕）。屏上放什么还没设计，这是个空位
-// 2026-11-22 总控令：空位不再空着。这句的要紧词（架子给的 big）放大摆在台上，这句一开口就一格一格锁定出来，停顿时留着，下一句开口或说完 1.2 秒后收
+// 2026-11-22 改：空位不再空着。这句的要紧词（架子给的 big）放大摆在台上，这句一开口就一格一格锁定出来，停顿时留着，下一句开口或说完 1.2 秒后收
 function bigWord(t) {
   const l = LINES.filter(l => l.big && t >= l.t0 - 0.12 && t < (l.be ?? l.t1 + 0.32)).pop(); if (!l) return;
   const w = l.big, n = [...w].length, size = Math.min(190, Math.floor(860 / (n * 1.04))), cy = 760, end = l.be ?? l.t1 + 0.32;

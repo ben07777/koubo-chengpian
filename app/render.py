@@ -18,7 +18,7 @@ FLAGS = ['--font-render-hinting=none', '--force-color-profile=srgb',
          '--disable-background-networking', '--disable-component-update', '--no-first-run', '--no-default-browser-check',
          '--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationGuideOnDeviceModel,msEdgeAIFeatures,EdgeCopilot',
          '--disable-sync', '--hide-scrollbars', '--mute-audio',
-         # 11-10 合并盲审：上面几条关不住 Edge 自己去连 bing、微软对时。出片浏览器一律不许连外网：代理指向本机没人听的端口，
+         # 11-10 合并检查：上面几条关不住 Edge 自己去连 bing、微软对时。出片浏览器一律不许连外网：代理指向本机没人听的端口，
          # 网址一律查不到（只认本机）。画面页要的东西全由 _open 里的拦截从本机文件供，不受影响。
          '--proxy-server=127.0.0.1:9', '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost']
 
@@ -27,7 +27,7 @@ def ffmpeg():
     p = ROOT / 'runtime' / 'ffmpeg.exe'
     if p.exists():
         return str(p)
-    if (ROOT / 'runtime' / 'python' / 'python.exe').exists():   # 11-12 盲审轻3：免安装包里那份不见了，不悄悄改用电脑上别的 FFmpeg
+    if (ROOT / 'runtime' / 'python' / 'python.exe').exists():   # 11-12 检查轻3：免安装包里那份不见了，不悄悄改用电脑上别的 FFmpeg
         raise RuntimeError('软件文件夹里的 ffmpeg.exe 不见了，可能被杀毒软件拿走了。把压缩包重新解压一次，或者到杀毒软件的隔离区把它恢复。')
     return 'ffmpeg'
 
@@ -61,7 +61,7 @@ def stage_url(cover=None):
 def page_data(juben_json, opts=None):
     """剧本 + 画风参数 → 画风页读的 data.js。画风只从这里拿东西，不碰原文。"""
     j = json.loads(Path(juben_json).read_text(encoding='utf-8'))
-    try:                                                   # 11-10 复审第 4 条：每句的数块（和字幕断行同一套），画风折大字时整块不拆
+    try:                                                   # 11-10 检查第 4 条：每句的数块（和字幕断行同一套），画风折大字时整块不拆
         import shuzi
         for l in j.get('lines', []): l['nb'] = [[a, b] for a, b in shuzi.blocks(l.get('text') or ''.join(c[0] for c in l.get('cs', [])))]
     except Exception: pass                                 # 算不出就不给，画风照旧
@@ -167,7 +167,7 @@ async def _seg(juben_json, out, fps, n0, n1, slot, progress=None, style='字卡'
         ff.stdin.close()
         rc=ff.wait()
         await ctx.close()
-        await ctx.browser.close()   # 11-12 盲审中1：连浏览器一起关，它在系统临时夹里建的那个夹才会删掉
+        await ctx.browser.close()   # 11-12 检查中1：连浏览器一起关，它在系统临时夹里建的那个夹才会删掉
         if rc: raise RuntimeError("动效画面编码失败")
         if errs: raise RuntimeError('画面页出错：' + '; '.join(errs[:3]))
 
@@ -215,7 +215,7 @@ def stills(juben_json, times, out_dir, cover=None, style='字卡', opts=None, fm
                     else: await pg.screenshot(path=str(f), type='jpeg', quality=85)
                     res.append(f)
             await ctx.close()
-            await ctx.browser.close()   # 11-12 盲审中1：同上，连浏览器一起关
+            await ctx.browser.close()   # 11-12 检查中1：同上，连浏览器一起关
             if errs: print('页面报错：', errs[:5])
             return res
     return asyncio.run(main())

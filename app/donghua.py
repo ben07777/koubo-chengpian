@@ -140,9 +140,9 @@ _CHANGE = re.compile(r'变成|变为|变得|变了|涨到|降到|升到|跌到|�
 _WHEN = re.compile(r'\d{2,4}年|\d+月|\d+[号日]|\d+点|[去今明前后]年|上个?月|这个?月|下个?月|[昨今明前后]天|早上|上午|中午|下午|晚上|夜里|凌晨|第[一二三四五六七八九十\d]+(?:天|周|个月|年|季度|阶段|轮)|[一二三四]季度|上半年|下半年|年初|年中|年底|月初|月底|周[一二三四五六日末]|星期[一二三四五六日天]|[春夏秋冬]天|小时候|长大后|毕业后|刚开始|一开始|后来|最后|现在|以前|当年')
 _COMMON = ('我们', '你们', '他们', '大家', '时候', '东西', '事情', '问题', '一个', '什么', '怎么', '因为', '所以', '但是', '然后', '就是', '可以', '可能', '没有', '已经', '还是', '自己', '知道', '觉得', '非常', '比较', '其实', '如果', '虽然', '而且', '或者', '一些', '很多', '现在', '今天')
 _LAB_HEAD = re.compile(r'^(?:不是|就是|而是|是|的|和|跟|与|而)')
-_LAB_TAIL = re.compile(r'(?:的|和|跟|与|把|被|是|让|给|更|很|最|太|也|就|都|又|才|却)$')   # 第三轮盲判：牌子「让设备更」话没说完
-_MIDP = re.compile(r'.[呢呀啊哎嘛].')                                      # 牌子、纸条中间夹着语气词：是整句口水话，不是要点（第三轮盲判：「死活呢不让AA」）
-_SUMUP = re.compile(r'[两二三四五六七八九][套种类项样条件点个大]')            # 要点里带着总数的话（第三轮盲判：「功能量两套方案」把「两套方案」粘在了后一样上）
+_LAB_TAIL = re.compile(r'(?:的|和|跟|与|把|被|是|让|给|更|很|最|太|也|就|都|又|才|却)$')   # 第三轮检查：牌子「让设备更」话没说完
+_MIDP = re.compile(r'.[呢呀啊哎嘛].')                                      # 牌子、纸条中间夹着语气词：是整句口水话，不是要点（第三轮检查：「死活呢不让AA」）
+_SUMUP = re.compile(r'[两二三四五六七八九][套种类项样条件点个大]')            # 要点里带着总数的话（第三轮检查：「功能量两套方案」把「两套方案」粘在了后一样上）
 _NTH = re.compile(r'^第[一二三四五六七八九十\d]')                           # 「第三种」这类过渡的序号，圈起来没有意思
 _NTH_STEP = re.compile(r'第[一二三四五六七八九十\d]步')
 _CHG_V = re.compile(r'变成|变为|变得')
@@ -203,7 +203,7 @@ _TAILP = re.compile(r'[哎啊呢吧呀嘛哦啦哈]+$')
 
 def _label(v, T, la, lb, K, most, need=True, what='名字'):
     w = _txt(v)
-    if len(_TAILP.sub('', w)) >= 2: w = _TAILP.sub('', w)   # 末尾的语气词不上画面（11-14 盲判：「颜色鲜艳哎」）
+    if len(_TAILP.sub('', w)) >= 2: w = _TAILP.sub('', w)   # 末尾的语气词不上画面（11-14 检查：「颜色鲜艳哎」）
     if not w:
         if need: raise Bad('缺{}'.format(what))
         return '', None
@@ -286,7 +286,7 @@ def _check(a, T, K, most):
         return w, at, v, u
 
     span = ''.join(T[la:lb])
-    if kind in ('比多少', '几组对比') and _LOSS.search(span): raise Bad('这几句里有亏有赚，不摆成高矮比')   # 第二轮盲判：利润 10 亿和亏损 6 亿被摆成两摞
+    if kind in ('比多少', '几组对比') and _LOSS.search(span): raise Bad('这几句里有亏有赚，不摆成高矮比')   # 第二轮检查：利润 10 亿和亏损 6 亿被摆成两摞
     if kind == '比多少':
         x, y = lab('甲', LAB_MAX), lab('乙', LAB_MAX)
         if x == y: raise Bad('甲和乙是同一个')
@@ -316,20 +316,20 @@ def _check(a, T, K, most):
         out['组'] = rows
     elif kind == '亮出大数':
         w, at, v, u = num('数')
-        if re.search(r'\d$', _QPOST.sub('', w)): raise Bad('数「{}」没带单位，亮出来不知道是什么'.format(w))   # 11-14 盲判：「失业率是41」
+        if re.search(r'\d$', _QPOST.sub('', w)): raise Bad('数「{}」没带单位，亮出来不知道是什么'.format(w))   # 11-14 检查：「失业率是41」
         rest = T[at[0]][at[1] + len(w):] or (T[at[0] + 1] if at[0] + 1 < len(T) else '')
         if _TIME_IN.search(w): raise Bad('「{}」说的是时候，不当数画'.format(w))   # 第二份考卷：数里自己带着「之后」
-        if _TIME_U.search(w) and _TIME_AFTER.match(rest): raise Bad('「{}{}」说的是时候，不当数画'.format(w, _TIME_AFTER.match(rest).group(0)))   # 11-14 盲判：「35年之后」
+        if _TIME_U.search(w) and _TIME_AFTER.match(rest): raise Bad('「{}{}」说的是时候，不当数画'.format(w, _TIME_AFTER.match(rest).group(0)))   # 11-14 检查：「35年之后」
         soft('什么', WHAT_MAX, '什么')
         out['数'] = w; out['at']['数'] = list(at)
     elif kind == '并排对照':
         x, y = lab('左', LAB_MAX), lab('右', LAB_MAX)
         if x == y: raise Bad('左和右是同一个')
-        if _CHAIN.search(span): raise Bad('这几句是一件事接一件事，不是两样对着看')   # 第二轮盲判：替代→失业→没人消费→停摆
+        if _CHAIN.search(span): raise Bad('这几句是一件事接一件事，不是两样对着看')   # 第二轮检查：替代→失业→没人消费→停摆
         for w in (x, y):
-            if w in _EMPTY_LAB: raise Bad('名字「{}」当不了对照的一边'.format(w))     # 第二轮盲判：AI开药 / 范围
-            if _LAB_HEAD.search(w) or _LAB_TAIL.search(w): raise Bad('名字「{}」截得读不通'.format(w))   # 11-14 盲判：「不是把人」「是不让新人」「没用的」
-        if not (soft('左说', SAY_MAX, '左说') and soft('右说', SAY_MAX, '右说')):   # 11-14 盲判后收紧：两边的说明凑不齐就整处不要（两个并列的条件被当成对照，就是这样混进来的）
+            if w in _EMPTY_LAB: raise Bad('名字「{}」当不了对照的一边'.format(w))     # 第二轮检查：AI开药 / 范围
+            if _LAB_HEAD.search(w) or _LAB_TAIL.search(w): raise Bad('名字「{}」截得读不通'.format(w))   # 11-14 检查：「不是把人」「是不让新人」「没用的」
+        if not (soft('左说', SAY_MAX, '左说') and soft('右说', SAY_MAX, '右说')):   # 11-14 检查后收紧：两边的说明凑不齐就整处不要（两个并列的条件被当成对照，就是这样混进来的）
             raise Bad('并排对照两边都要有说明，凑不齐')
         for w in (out['左说'], out['右说']):
             if len(w) < 3 or _LAB_TAIL.search(w): raise Bad('并排对照的说明「{}」单看读不通'.format(w))
@@ -339,13 +339,13 @@ def _check(a, T, K, most):
         w = lab('词', LAB_MAX, what='词')
         if len(w) < 2: raise Bad('圈的词太短')
         if w in _COMMON: raise Bad('「{}」是谁都会说的词，不圈'.format(w))
-        if _NTH.search(w): raise Bad('「{}」只是个序号，不圈'.format(w))        # 第三轮盲判：「第三种」
+        if _NTH.search(w): raise Bad('「{}」只是个序号，不圈'.format(w))        # 第三轮检查：「第三种」
         if re.search(r'\d', w) or len(K['num_blocks'](w)): raise Bad('「{}」是数，不圈'.format(w))
     elif kind == '一步接一步':
         ps = a.get('步')
         if not isinstance(ps, list) or not 2 <= len(ps) <= 4: raise Bad('步要两到四个')
         if not _STEP.search(span) and most == MAX_SPAN: raise Bad('这几句里没有先后的话，不算一步接一步')
-        if len(set(_NTH_STEP.findall(span))) == 1: raise Bad('这几句讲的是其中一步里头的事，不是几步')   # 第三轮盲判：「训练的第二步 / 模仿 / 示范回答 / 照着去学」，模仿是这一步的名字
+        if len(set(_NTH_STEP.findall(span))) == 1: raise Bad('这几句讲的是其中一步里头的事，不是几步')   # 第三轮检查：「训练的第二步 / 模仿 / 示范回答 / 照着去学」，模仿是这一步的名字
         pts, ats = [], []
         for v in ps:
             w, at = _label(v, T, la, lb, K, POINT_MAX, what='步')
@@ -360,10 +360,10 @@ def _check(a, T, K, most):
         if x == y or x in y or y in x: raise Bad('{}和{}是同一句话'.format(k1, k2))
         if not (_CAUSE if kind == '因果' else _CHANGE).search(span): raise Bad('这几句里没有{}的话'.format('因为、所以这类' if kind == '因果' else '原来、后来、变成这类'))
         if kind == '前后变化' and out['at'][k1] > out['at'][k2]: raise Bad('前和后的先后和说的不一样')
-        if kind == '前后变化' and _CHG_V.search(x): raise Bad('「前」自己就是一句「变成」，是一环接一环，不是一样东西变了样')   # 第三轮盲判：工资变成消费 / 消费变成企业收入
+        if kind == '前后变化' and _CHG_V.search(x): raise Bad('「前」自己就是一句「变成」，是一环接一环，不是一样东西变了样')   # 第三轮检查：工资变成消费 / 消费变成企业收入
         for w in (x, y):
             if _LAB_TAIL.search(w) or len(w) < 2: raise Bad('「{}」截得读不通'.format(w))
-    elif kind in ('转折', '一好一坏'):                                           # 11-14 傍晚加（整片盲审：最有戏的转折没画面；一好一坏被挂成并列的牌子）
+    elif kind in ('转折', '一好一坏'):                                           # 11-14 傍晚加（整片检查：最有戏的转折没画面；一好一坏被挂成并列的牌子）
         k1, k2 = ('前半', '后半') if kind == '转折' else ('好', '坏')
         x, y = lab(k1, TURN_MAX, what=k1), lab(k2, TURN_MAX, what=k2)
         if x == y or x in y or y in x: raise Bad('{}和{}是同一句话'.format(k1, k2))
@@ -384,7 +384,7 @@ def _check(a, T, K, most):
             if tm in seen: raise Bad('有两个时候是同一个')
             seen.add(tm); rows.append({'时': tm, '事': ev, 'at': {'时': list(tat), '事': list(eat)}}); ats.append(list(tat))
         if ats != sorted(ats): raise Bad('时间点的先后和说的先后不一样')
-        if any(_CLOCK.search(g['时']) for g in rows) and any(_YM.search(g['时']) for g in rows): raise Bad('钟点和年月不在一条时间线上')   # 第三轮盲判：「今年7月升级」和订餐要求里的「晚上7点」
+        if any(_CLOCK.search(g['时']) for g in rows) and any(_YM.search(g['时']) for g in rows): raise Bad('钟点和年月不在一条时间线上')   # 第三轮检查：「今年7月升级」和订餐要求里的「晚上7点」
         out['时间点'] = rows
     else:   # 几个要点
         ps = a.get('点')
@@ -397,9 +397,9 @@ def _check(a, T, K, most):
             if _SUMUP.search(w): raise Bad('要点「{}」里带着总数的话'.format(w))
             pts.append(w); ats.append(list(at))
         if ats != sorted(ats): raise Bad('要点的先后和说的先后不一样')
-        if len(pts) == 2 and ats[0][0] == ats[1][0]: raise Bad('一句话里顺口带过的两个词，不算几样')   # 整片盲审：「既体面又自然」挂成两块牌子，是一句带过的话
+        if len(pts) == 2 and ats[0][0] == ats[1][0]: raise Bad('一句话里顺口带过的两个词，不算几样')   # 整片检查：「既体面又自然」挂成两块牌子，是一句带过的话
         near = ''.join(T[max(0, la - 2):lb])
-        for m in _COUNT.finditer(near):                                        # 第二轮盲判：前面说「这三种东西」，牌子只挂了两块
+        for m in _COUNT.finditer(near):                                        # 第二轮检查：前面说「这三种东西」，牌子只挂了两块
             if m.group(0).endswith('点') and (m.group(1).isdigit() or near[max(0, m.start() - 2):m.start()] in _DAYPART): continue   # 「晚上7点」是钟点，不是七点（11-14 整片：订餐的几个条件因此整处被拦）
             k = _CN_N.get(m.group(1)) or int(m.group(1))
             if k != len(pts): raise Bad('前面说的是 {} 样，牌子却是 {} 块'.format(k, len(pts)))

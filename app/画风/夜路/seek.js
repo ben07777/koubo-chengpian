@@ -11,7 +11,7 @@ const YH = 560, X0 = 470, K = 2420, HOOD = 1330, F = 1100, CAMH = 2.2;
 const PAINT = '#D9D4C4', GOLD = '#E8B84B', RED = '#D8392B', GREEN = '#3FBF6F', AMBER = '#E9A23B', POST = '#C9A35A', BLACK = '#07080A';
 const LN = EV.lines, GR = EV.groups, A = EV.acts, DUR = EV.dur;
 const dt = 1 / 120;
-let LATER = [];   // 11-10 复审：灯阵的数等路上的东西都画完再画，牌子、车都挡不住
+let LATER = [];   // 11-10 检查：灯阵的数等路上的东西都画完再画，牌子、车都挡不住
 let S = [], speedKeys = [], lightKeys = [], latKeys = [], roadWords = [], sideSigns = [], gantries = [], boards = [], barriers = [], reds = [], curves = [], cars = [], bumps = [], tile = null, END = null;
 const word2tex = {};
 function tex(word, col) {
@@ -48,7 +48,7 @@ function build() {
       else latKeys.push([resume, .84, 1.2], [resume + 2.2, 1.2, 0]);
     }
     if ((a.k === 'range' || a.k === 'stat') && a.wait) {
-      const tLo = a.tLo != null ? a.tLo : a.t, end = a.t1, settle = a.tLo != null ? a.tHi + .36 : a.t + .4, tGreen = Math.max(end - .18, tLo + .3, settle + .7);   // 11-10 复审：数停稳以后至少亮 0.7 秒再变绿（原来句子短，「90天」滚到 87 就熄灯）
+      const tLo = a.tLo != null ? a.tLo : a.t, end = a.t1, settle = a.tLo != null ? a.tHi + .36 : a.t + .4, tGreen = Math.max(end - .18, tLo + .3, settle + .7);   // 11-10 检查：数停稳以后至少亮 0.7 秒再变绿（原来句子短，「90天」滚到 87 就熄灯）
       const ease = .48, tb = Math.max(tLo - ease, 0);
       stops.push({ a: tb, b: tLo, v: 0, kind: 'ease' }, { a: tLo, b: tGreen, v: 0, kind: 'hold' }, { a: tGreen, b: tGreen + .56, v: 8, kind: 'free' });
       const hasRaw = a.k === 'stat' ? !!a.raw : !!(a.rawLo && a.rawHi);                     // 11-09 第三轮：抄不准字幕原文的数，灯阵不亮数
@@ -301,7 +301,7 @@ function drawRed(c, r, t, z, proj, yh) {
   const hiNow = t >= tHi, rw = a.tLo != null ? (hiNow ? a.rawHi : a.rawLo) : a.raw;    // 停住时照抄字幕原文
   const done = a.tLo != null ? (hiNow ? t >= tHi + dr : t >= a.tLo + dr) : t >= a.t + .4;
   if (!green && t >= r.t - .02 && !r.noNum) {
-    // 11-10 复审：范围原来一次只亮一头（先 30 后 60），单位画在数右边、被牌子挡住（「2个月」看着像「21」）。
+    // 11-10 检查：范围原来一次只亮一头（先 30 后 60），单位画在数右边、被牌子挡住（「2个月」看着像「21」）。
     // 现在后半一出来，前半和「到」照抄字幕原文一起亮，落定读「30到60天」；数和单位一起居中，太宽整体缩小；等路上的东西都画完再画，谁也挡不住
     const pan = proj(0, 6.9, z), col = tHi <= t ? '#A82A20' : RED, parts = [];
     if (a.tLo != null && hiNow) {

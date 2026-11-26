@@ -11,7 +11,7 @@ const BASE = 860, R = 58, GRAV = 5200, DROP = 420, ZB = 1.3, SCREEN_Y = 800, REA
 const G = EV.groups, A = EV.acts, LN = EV.lines, DUR = EV.dur;
 let STATS = [], legs = [], plats = [], lands = [], moods = [], bursts = [], strips = [], signs = [], flyers = [], longs = [], crowds = [], doors = [], tags = [], rollN = [], camX = [], camY = [], zoomKeys = [], anchorKeys = [], wilts = [];
 let tile = null, FALL = null;
-let EL = 0, ER = 1080, ZC = 1;   // 11-10 复审：这一帧画面左右边在世界里的位置
+let EL = 0, ER = 1080, ZC = 1;   // 11-10 检查：这一帧画面左右边在世界里的位置
 const vis = (a, b) => clamp((a - EL) * ZC / 30) * clamp((ER - b) * ZC / 30);   // 字从 a 到 b：快被画面边切到时先淡出，切到了就不画（不露半截数）
 const near = (a, b, e = .02) => Math.abs(a - b) < e;
 const fontWord = px => `${px}px Glow`, fontNum = px => `900 ${px}px Noto`;
@@ -347,7 +347,7 @@ function seek(t) {
     if (p.word) {
       const by = topY + 14, bh = 134, bw = p.w - 8, bx = p.x + 4, col = p.hero ? HERO : TOP, ink = p.hero ? TOP : INK;
       pRect(c, bx, by, bw, bh, col, null);
-      const tw = Math.min(textW(p.word, 112), bw - 24), tc = bx + bw / 2;   // 11-10 复审：台阶块滑出画面时「负5%」露成「5%」；字快被切到就先淡出
+      const tw = Math.min(textW(p.word, 112), bw - 24), tc = bx + bw / 2;   // 11-10 检查：台阶块滑出画面时「负5%」露成「5%」；字快被切到就先淡出
       c.globalAlpha = vis(tc - tw / 2, tc + tw / 2); if (c.globalAlpha > 0) stamp(c, p.word, bx, by, bw, bh, ink, t, p.wordT - .02); c.globalAlpha = 1;
     }
     if (p.n && t >= p.sink) { c.fillStyle = BALL; c.font = fontNum(60); c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillText(String(p.n), p.x + p.w / 2, topY - 12); }
@@ -418,7 +418,7 @@ function seek(t) {
   for (const g of tags) {
     if (t < g.t || (FALL && t > FALL.t)) continue;
     const m = textW(g.word, 74);
-    c.globalAlpha = vis(g.x - m / 2 - 20, g.x + m / 2 + 20); if (c.globalAlpha > 0) blockText(c, g.word, g.x - m / 2 - 20, g.y - 96 + 0, m + 40, 96, TOP, INK, 74); c.globalAlpha = 1;   // 11-10 复审：同台阶块
+    c.globalAlpha = vis(g.x - m / 2 - 20, g.x + m / 2 + 20); if (c.globalAlpha > 0) blockText(c, g.word, g.x - m / 2 - 20, g.y - 96 + 0, m + 40, 96, TOP, INK, 74); c.globalAlpha = 1;   // 11-10 检查：同台阶块
   }
   // 一群
   for (const k of crowds) drawCrowd(c, k, t);
@@ -513,7 +513,7 @@ function repeatWord(c, l, t, x0, x1, th, ink, z, local) {
   const k = 1 + .3 * (1 - P(t, l.charT, l.charT + .09, E.outC));
   for (let X = start + (local ? base : 0); X < x1; X += sp) {
     if (X + textW(l.word, px) < x0) continue;
-    if (!local) { c.globalAlpha = vis(X, X + textW(l.word, px)); if (!(c.globalAlpha > 0)) { c.globalAlpha = 1; continue; } }   // 11-10 复审：被画面边切到的先淡出
+    if (!local) { c.globalAlpha = vis(X, X + textW(l.word, px)); if (!(c.globalAlpha > 0)) { c.globalAlpha = 1; continue; } }   // 11-10 检查：被画面边切到的先淡出
     let dx = 0;
     chars.forEach((ch, i) => {
       if (t >= l.charT + i * .12) { c.save(); c.translate(X + dx, th / 2 + (local ? 0 : l.y) + 4); c.scale(k, k); c.fillText(ch, 0, 0); c.restore(); }
@@ -580,7 +580,7 @@ function drawCount(c, s, t) {
   const f = Math.min(1, 1000 / (mw(120, pre) + mw(90, cn) + (pre ? 24 : 0) + mw(200, num) + mw(90, u) + 16));
   const pw = mw(120 * f, pre), cnw = mw(90 * f, cn), w = mw(200 * f, num), uw = mw(90 * f, u), g = pre ? 12 * f : 0;
   const X0 = 540 - (pw + cnw + 2 * g + w + uw + 16 * f) / 2, X = X0 + pw + cnw + 2 * g, Y = 470 - up;
-  c.lineJoin = 'round'; c.strokeStyle = INK;   // 11-10 复审：描深色边，同 drawStat
+  c.lineJoin = 'round'; c.strokeStyle = INK;   // 11-10 检查：描深色边，同 drawStat
   if (pre) { c.font = fontNum(120 * f); c.fillStyle = INK; c.fillText(pre, X0 + 4, Y + 4); c.lineWidth = 10 * f; c.strokeText(pre, X0, Y); c.fillStyle = GOLD; c.fillText(pre, X0, Y); c.font = fontNum(90 * f); c.lineWidth = 8 * f; c.strokeText(cn, X0 + pw + g, Y); c.fillStyle = TOP; c.fillText(cn, X0 + pw + g, Y); }
   c.font = fontNum(200 * f); c.fillStyle = INK; c.fillText(num, X + 5, Y + 5); c.lineWidth = 12 * f; c.strokeText(num, X, Y); c.fillStyle = t >= s.tHi ? GOLD2 : GOLD; c.fillText(num, X, Y);
   if (u && (hiNow || t >= s.tLo + s.r1)) { c.font = fontNum(90 * f); c.lineWidth = 8 * f; c.strokeText(u, X + w + 16 * f, Y); c.fillStyle = TOP; c.fillText(u, X + w + 16 * f, Y); }
@@ -592,7 +592,7 @@ function drawStat(c, a, t) {
   c.font = fontNum(180); c.textBaseline = 'alphabetic'; c.textAlign = 'left';
   const w = c.measureText(num).width; c.font = fontNum(80); const uw = c.measureText(suf).width;
   const X = Math.max(40, 540 - (w + uw + 14) / 2), Y = 460 - up;
-  c.lineJoin = 'round'; c.strokeStyle = INK;   // 11-10 复审：描一圈深色边。小球也是黄的，跳到数后面时「12.5%」的「1」看不出来，像「2.5%」
+  c.lineJoin = 'round'; c.strokeStyle = INK;   // 11-10 检查：描一圈深色边。小球也是黄的，跳到数后面时「12.5%」的「1」看不出来，像「2.5%」
   c.font = fontNum(180); c.fillStyle = INK; c.fillText(num, X + 5, Y + 5); c.lineWidth = 12; c.strokeText(num, X, Y); c.fillStyle = GOLD; c.fillText(num, X, Y);
   c.font = fontNum(80); c.lineWidth = 8; c.strokeText(suf, X + w + 14, Y); c.fillStyle = TOP; c.fillText(suf, X + w + 14, Y);
 }

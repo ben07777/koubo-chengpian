@@ -42,13 +42,13 @@ a{color:var(--link)}.hide{display:none}
 .ln .say{grid-column:2/4;font-size:13px;color:var(--acc);margin-top:-2px}.ln .say.note{color:var(--sub)}
 .chip .k{color:var(--sub);font-size:12px;margin-right:2px}.chip.mo{background:#F3F0EA}.chip .cn{font-size:13px;color:var(--sub);margin-left:2px}
 #ask{background:#FFF8E8;border:1.5px solid #EBD9A8;border-radius:12px;padding:12px 16px;margin-bottom:16px}
-.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}.ver{color:var(--sub);font-size:13px}.quit{margin-left:10px;border:1px solid var(--line,#ccd);background:none;color:var(--sub);font-size:13px;padding:2px 10px;border-radius:6px;cursor:pointer}.quit:hover{color:var(--acc)}.bye{max-width:520px;margin:80px auto;text-align:center;font-size:18px;line-height:1.9}.foot{text-align:center;margin-top:28px}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}.ver{color:var(--sub);font-size:13px}.ver a.xin{color:var(--acc,#d26a00);font-weight:600}#xinBak{margin-left:6px}.quit{margin-left:10px;border:1px solid var(--line,#ccd);background:none;color:var(--sub);font-size:13px;padding:2px 10px;border-radius:6px;cursor:pointer}.quit:hover{color:var(--acc)}.bye{max-width:520px;margin:80px auto;text-align:center;font-size:18px;line-height:1.9}.foot{text-align:center;margin-top:28px}
 input[type=checkbox],input[type=radio]{width:18px;height:18px;accent-color:var(--acc);vertical-align:-3px;cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible,.sw:focus-visible,#drop:focus-visible{outline:3px solid #1F4FB5;outline-offset:2px}
 a.pro{color:var(--link);font-weight:bold;font-size:15px}
 @media(max-width:760px){.res{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
-<div class="top"><h1>口播成片</h1><span class="ver"><span id="ver"></span><a href="https://github.com/ben07777/koubo-chengpian/releases" target="_blank" rel="noopener noreferrer" title="在浏览器里打开发布页，自己看有没有新版。软件不会自己联网去查。">看看有没有新版</a><button type="button" class="quit" id="quit" title="不用了就点这里退出软件。下次要用，再双击「剪一条」。">关掉软件</button></span></div>
+<div class="top"><h1>口播成片</h1><span class="ver"><span id="ver"></span><a id="xinLink" href="https://github.com/ben07777/koubo-chengpian/releases" target="_blank" rel="noopener noreferrer" title="在浏览器里打开发布页，看看有没有新版。">看看有没有新版</a><a id="xinBak" href="https://github.com/ben07777/koubo-chengpian/releases" target="_blank" rel="noopener noreferrer" hidden>（GitHub 备用）</a><button type="button" class="quit" id="quit" title="不用了就点这里退出软件。下次要用，再双击「剪一条」。">关掉软件</button></span></div>
 <p class="lead">把一段口播剪成竖屏视频，字幕、重点词和两张封面一起生成。<br><span class="safe">本地运行 · 不开云端，录音、视频、字幕都不出电脑 · 免登录</span></p>
 
 <div class="card" id="pick">
@@ -64,7 +64,7 @@ a.pro{color:var(--link);font-weight:bold;font-size:15px}
   <div class="row hide" id="words"><label class="lab" for="focus">强调词</label><input id="focus" type="text" maxlength="50" placeholder="留空自动选词"><span class="tip">可填同一句里依次说到的 1–3 个词，用逗号隔开。</span></div>
   <div class="row hide" id="cloudRow"><span class="lab trialLab">专业版（试用）</span><label><input type="checkbox" id="ai"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
   <div class="row hide" id="codeRow"><span class="lab">次数码</span><input type="text" id="code" maxlength="40" placeholder="买了专业版的，把次数码填这里" style="width:280px"><button class="sec" id="codeSave">保存</button><span class="tip" id="codeTip">没有次数码也能用：免费版全在你电脑上排画面。</span><a class="pro" href="/web/pro.html" target="_blank" id="proLink">了解专业版</a></div>
-  <div id="ask" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk">知道了，用云端</button><button class="sec" id="askNo">不用云端</button></div></div>
+  <div id="ask" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码、录音记号这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk">知道了，用云端</button><button class="sec" id="askNo">不用云端</button></div></div>
   <p class="tip hide proNote"></p>
   <div class="row"><span class="lab">自动剪辑</span><label><input type="checkbox" id="trim" checked> 自动剪掉气口和口误</label><span class="tip">句子之间过长的停顿剪短，“嗯”“呃”删掉，说错重说的只留最后一遍。剪了哪些地方，做完会列出来</span></div>
   <div class="row"><span class="lab">背景音乐</span><label><input type="checkbox" id="music"> 添加自动配乐</label><span class="tip">程序在本机合成轻音乐。生成后可以在下方修改区换成本地音乐</span></div>
@@ -107,7 +107,7 @@ a.pro{color:var(--link);font-weight:bold;font-size:15px}
   <div class="row" id="themes2"><span class="lab">录音配色</span><span id="sw2"></span></div>
   <div class="row hide" id="cloudRow2"><span class="lab trialLab">专业版（试用）</span><label><input type="checkbox" id="ai2"> 把字幕文字发到云端，让<span class="mdl">云端模型</span>排画面</label><span class="tip">云端帮你挑上屏的词。发的是字幕文字和几个记数用的编号，录音和视频不上传。用的是<span class="mdl">云端模型</span><span class="beianPart" hidden>，算法备案号：<span class="beian"></span></span>。<a href="/web/pro.html" target="_blank">详细说明</a></span></div>
   <div class="row hide" id="lookRow2"><span class="lab">画面样子</span><span id="lk2" style="display:flex;gap:14px;flex-wrap:wrap"><span class="sw on" data-k="全息">全息</span><span class="sw" data-k="象形">象形图形</span></span><span class="tip">开了上面的云端才有这两种样子。换样子再出一遍，不另扣条数。</span></div>
-  <div id="ask2" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk2">知道了，用云端</button><button class="sec" id="askNo2">不用云端</button></div></div>
+  <div id="ask2" class="hide">这段录音的<b>字幕文字</b>和每句开始的秒数会发到云端，让<span class="mdl">云端模型</span>帮你排画面；另外带上设备号、次数码、录音记号这些记数用的编号。录音和视频不上传。出片前，请在修改页把画面上的词看一遍。<a href="/web/pro.html" target="_blank">发了哪些东西</a>　不想用可以关，关了就在你电脑上排。<div class="row" style="margin-top:10px"><button class="sec" id="askOk2">知道了，用云端</button><button class="sec" id="askNo2">不用云端</button></div></div>
   <div class="row hide" id="prow2" hidden><span class="lab">真人出镜</span><label><input type="checkbox" id="keep2" checked> 真人精剪 · 保留原画面</label></div>
   <div class="row hide" id="words2"><label class="lab" for="focus2">强调词</label><input id="focus2" type="text" maxlength="50" placeholder="留空自动选词"></div>
   <div class="row hide" id="crow"><span class="lab">封面</span>使用第 <input type="number" id="ct" min="0" step="0.1" style="width:90px;font-size:17px;padding:6px 8px;border:1.5px solid var(--line);border-radius:10px"> 秒的画面
@@ -181,6 +181,13 @@ $('#quit').onclick = async () => {
   document.body.innerHTML = '<div class="bye">口播成片已经关掉了，这个网页可以关了。<br>下次要用，再双击「剪一条」。</div>';
 };
 fetch('/api/ver').then(r => r.json()).then(j => { if (typeof j.v === 'string' && j.v) $('#ver').textContent = '版本 ' + j.v + ' · '; }).catch(() => {});
+fetch('/api/xinban').then(r => r.json()).then(x => {   // 1.4.2：有新版就把右上角那一行换成提醒；没有、问不到，照旧
+  if (!x || x['有新版'] !== true || typeof x['版本'] !== 'string') return;
+  const a = $('#xinLink'), how = '浏览器要是说「不安全」「已阻止」，点「保留」。下好以后解压到一个新文件夹用。要留的片子，先从老文件夹的「出片」里拷出来，再删老文件夹。填过次数码的，新文件夹里再填一次。';
+  a.textContent = '有新版 ' + x['版本'] + '，点这里下载'; a.classList.add('xin');
+  a.title = (typeof x['改了什么'] === 'string' && x['改了什么'] ? x['改了什么'] + '。' : '') + how;
+  if (typeof x['下载'] === 'string' && x['下载']) { a.href = x['下载']; $('#xinBak').hidden = false; }
+}).catch(() => {});
 fetch('/api/info').then(r => r.json()).then(j => {
   CLOUD = !!j.cloud; $('#cloudRow').classList.toggle('hide', !CLOUD);
   MODEL = j.model || ''; document.querySelectorAll('.mdl').forEach(x => x.textContent = MODEL || '云端模型');
@@ -335,7 +342,7 @@ function drawTkw() {
 const styleNote = () => {
   $('#styleNote').classList.toggle('hide', PERSON || style2 === DRAWN_STYLE);
   if (!STYLES.some(x => x.name === DRAWN_STYLE)) $('#styleNote').textContent = '这条片子是用以前的画面样子出的。这一版只剩字卡，重新生成会改用字卡。右边列的还是上一条片子画的东西；改成字卡可能会画出别的，出完片回这里再看一遍。';   /* 11-12：旧画风首页不列了，用户没地方「换」，照实说 */
-  if (!PERSON && LOOK_USED) { $('#editTip').textContent = '每行一句。左边改错字（语音识别难免有同音错字）。右边列的是这条片子里按意思配的画面：点 × 去掉那一张，那几句就只出字幕。画面里的字是你说的原话，这里改不了。改完点“重新生成”，不用重新识别字幕。还没点重新生成的，划掉的点 ↺ 就回来。'; return; }
+  if (!PERSON && LOOK_USED) { $('#editTip').textContent = '每行一句。左边改错字（语音识别难免有同音错字）。右边列的是这条片子里按意思配的画面：点 × 去掉那一张，那几句就只出字幕。画面上的字都从你说的话里取，最多省掉“的、了、你”这类字，不加字；这里改不了。改完点“重新生成”，不用重新识别字幕。还没点重新生成的，划掉的点 ↺ 就回来。'; return; }
   if (!PERSON) $('#editTip').textContent = DRAWN_STYLE === '字卡'
     ? '每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。'
     : '每行一句：左边改听错的字，右边点 × 去掉画面上的词，点词能换成别的词。改完点“重新生成”，不用重新识别。没重新生成之前，点 ↺ 能恢复。';

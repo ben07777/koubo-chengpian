@@ -73,7 +73,7 @@ function cardIcon(S) {
   return (ctx, t) => {
     const lt = t - a; ground(ctx, P, S.seed, lt);
     enterSubj(ctx, lt, S, DX, DY, R, c => { stageDisc(c, DX, DY, R, P.t[1], lt); ICONPIC.draw(c, S.icon, { x: DX, y: DY, size: 500, color: fg, lw: LW, ...ICONPIC.pose(slots, t) }); });
-    if (S.word) G.maskText(ctx, S.word, MX, 1296, big(fit(ctx, S.word, 240, W - 2 * MX, 6)), fg, inv(tw, tw + 0.5, t), { ls: '6px' });      // 只画图标的那张（总控 11-17）：不出字
+    if (S.word) G.maskText(ctx, S.word, MX, 1296, big(fit(ctx, S.word, 240, W - 2 * MX, 6)), fg, inv(tw, tw + 0.5, t), { ls: '6px' });      // 只画图标的那张（11-17）：不出字
   };
 }
 // 二甲、单子，一条一张卡快闪：{ rows, ts, as }。每条一张卡：圆盘上一个勾（勾是这种卡固定带的，不是通义挑的）、第几条共几条、一行大字
@@ -96,7 +96,7 @@ function cardList(S, pre) {
     const m = E.ioExp(inv(tm, tm + 0.45, t)); let px = 140; for (const r of S.rows) px = Math.min(px, fit(ctx, r, 140, BW - 80, 4));
     for (let i = 0; i < n; i++) {
       const dir = i % 2 ? 1 : -1, y = lerp(TOP + i * (BH + GAP), TOP + 1.5 * GAP + i * BH, m);
-      const pin = pre || (S.early && S.hasTr) ? 1 : E.ioExp(inv(0.04 + i * 0.07, 0.44 + i * 0.07, lt)), x = X0 + dir * W * (1 - pin);      // 总控 11-16：换屏一落定主体就得在，空位跟着换屏一起到
+      const pin = pre || (S.early && S.hasTr) ? 1 : E.ioExp(inv(0.04 + i * 0.07, 0.44 + i * 0.07, lt)), x = X0 + dir * W * (1 - pin);      // 11-16：换屏一落定主体就得在，空位跟着换屏一起到
       ctx.fillStyle = rgba(P.t[0], S.early ? 0.55 : 0.42); ctx.fillRect(x, y, BW, BH);                                       // 暗空位
       const said = pre ? 1 : E.ioExp(inv(ts[i] - 0.06, ts[i] + 0.3, t)), tnext = i + 1 < n ? ts[i + 1] : tm;
       const q = pre ? 1 : E.ioExp(inv(tnext - 0.06, tnext + 0.24, t)), un = E.ioExp(inv(tm + i * 0.06, tm + 0.3 + i * 0.06, t)), hot = Math.min(1, (1 - q) + un);      // 刚说到的那条是亮的，下一条说到它就退成暗的；并成一块的时候全亮
@@ -207,7 +207,7 @@ function cardPair(S) {
     for (let i = 0; i < n; i++) {
       const b = B[i], dir = i % 2 ? 1 : -1, y = TOP + i * (BH + GAP), { ix, headH, numH } = dims(b);
       const pin = i ? E.ioExp(inv(ts[i] - 0.4, ts[i], t)) : S.early && S.hasTr ? 1 : E.ioExp(inv(0.04, 0.44, lt)), x = X0 + dir * W * (1 - pin);
-      if (pin <= 0) continue;                                                                                              // 总控 11-16 夜：没进场的那块不画框（空着的深色框挂几秒像没加载出来），说到它才滑进来
+      if (pin <= 0) continue;                                                                                              // 11-16 夜：没进场的那块不画框（空着的深色框挂几秒像没加载出来），说到它才滑进来
       ctx.fillStyle = rgba(P.t[0], 0.55); ctx.fillRect(x, y, BW, BH);                                                        // 暗空位
       const said = E.ioExp(inv(ts[i] - 0.06, ts[i] + 0.3, t)), tnext = i + 1 < n ? ts[i + 1] : 1e9, hot = 1 - E.ioExp(inv(tnext - 0.06, tnext + 0.24, t));
       const bandCol = mix(P.t[0], fg, hot), txtCol = mix(fg, P.t[1], hot);
@@ -288,7 +288,7 @@ function cardSteps(S) {
   return (ctx, t) => {
     const lt = t - a; ground(ctx, P, S.seed, lt);
     const pin = S.early && S.hasTr ? 1 : E.ioExp(inv(0.02, 0.4, lt)); lay = lay || sameSize(ctx, R.map(r => r.t), 118, (x, px, i) => layText(ctx, x, px, TW, 2, 4, RH - 64, R[i].br));
-    const rp = i => i ? E.ioExp(inv(ts[i] - 0.45, ts[i] - 0.05, t)) : pin;      // 总控 11-17 夜：还没说到的那步不先摆（空圈、空带、02 挂几秒像没加载出来），说到它才连着线长出来，照两块
+    const rp = i => i ? E.ioExp(inv(ts[i] - 0.45, ts[i] - 0.05, t)) : pin;      // 11-17 夜：还没说到的那步不先摆（空圈、空带、02 挂几秒像没加载出来），说到它才连着线长出来，照两块
     ctx.fillStyle = rgba(P.t[0], 0.6); for (let i = 1; i < n; i++) if (rp(i) > 0) ctx.fillRect(CX - 9, TOP + (i - 0.5) * RH, 18, RH * rp(i));      // 暗的轨
     for (let i = 1; i < n; i++) { const g = E.ioExp(inv(ts[i] - 0.45, ts[i] - 0.05, t)); if (g > 0) { ctx.fillStyle = fg; ctx.fillRect(CX - 9, TOP + (i - 0.5) * RH, 18, RH * g); } }      // 亮的线从上一步长到这一步
     for (let i = 0; i < n; i++) {
@@ -308,7 +308,7 @@ function cardSteps(S) {
 // ───────── 这一段的排法 ─────────
 const TA = 0.12, TB = 0.26;
 // 没配上画面的那几句：只有底纹在滑（还有角上的小字和字幕）。屏上放什么还没设计，这是个空位
-// 2026-11-22 总控令：空位不再空着。这句的要紧词（架子给的 big）放大摆在中间，这句一开口就从蒙版里滑上来，停顿时留着，下一句开口或说完 1.2 秒后滑下去
+// 2026-11-22 改：空位不再空着。这句的要紧词（架子给的 big）放大摆在中间，这句一开口就从蒙版里滑上来，停顿时留着，下一句开口或说完 1.2 秒后滑下去
 function bigWord(ctx, P, t) {
   const l = LINES.filter(l => l.big && t >= l.t0 - 0.12 && t < (l.be ?? l.t1 + 0.32)).pop(); if (!l) return;
   const at = l.t0 - 0.12, end = l.be ?? l.t1 + 0.32, px = fit(ctx, l.big, 230, W - 2 * MX, 6), y = 860;
@@ -352,7 +352,7 @@ const drawShot = (ctx, s, t) => { ctx.save(); s.fn(ctx, t); ctx.restore(); };
 function hud(ctx, P, k) {                                        // 只放这条片真有的：第几张小画面、一共几张。格子一张一格
   const fg = P.fg, n = DATA.nAll; ctx.save();
   ctx.font = small(26); ctx.letterSpacing = '3px'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = rgba(fg, 0.8);
-  if (OPT.hudText !== false) { ctx.textAlign = 'left'; ctx.fillText(`第 ${k} 屏`, 64, 150); ctx.textAlign = 'right'; ctx.fillText(`共 ${n} 屏`, W - 64, 150); }      // 总控 11-16：角上的字去掉，只留底下那排小格（架子拼的页面不出字；老的出片脚本照旧）
+  if (OPT.hudText !== false) { ctx.textAlign = 'left'; ctx.fillText(`第 ${k} 屏`, 64, 150); ctx.textAlign = 'right'; ctx.fillText(`共 ${n} 屏`, W - 64, 150); }      // 11-16：角上的字去掉，只留底下那排小格（架子拼的页面不出字；老的出片脚本照旧）
   const x0 = 64, x1 = W - 64, y = 1700;                          // 抄：film.js 的进度小格（当前的又粗又高，过了的亮一点，没到的暗）
   for (let i = 1; i <= n; i++) {
     const x = lerp(x0, x1, (i - 1) / Math.max(1, n - 1)), now = i === k, done = i < k;
@@ -368,7 +368,7 @@ function subtitles(ctx, t, P) {                                  // 抄：film.j
   const s = SUB[i], lt = t - s.t0, out = s.end - t, band = P.fg === G.CREAM ? P.t[0] : PAL.ink.t[1], y = 1490, bh = 108;
   let bw = subW(ctx, s); if (s.jp) bw = lerp(subW(ctx, SUB[i - 1]), bw, E.oExp(inv(0, 0.2, lt)));      // 两句挨着：带子不收，只变宽窄
   const p = (s.jp ? 1 : E.oExp(inv(0, 0.22, lt))) * (s.jn ? 1 : E.oExp(inv(0, 0.2, out))), x = W / 2 - bw * p / 2;
-  if (!s.text || bw * p < 80) return;                                // 总控 11-17 夜：没有字的时候不画底条（两次盲看都说字幕条空着闪一下）
+  if (!s.text || bw * p < 80) return;                                // 11-17 夜：没有字的时候不画底条（两次试看都说字幕条空着闪一下）
   ctx.save(); ctx.fillStyle = band; ctx.fillRect(x, y, bw * p, bh); ctx.beginPath(); ctx.rect(x, y, bw * p, bh); ctx.clip();
   G.maskText(ctx, s.text, W / 2, 1568, SUBF, G.CREAM, 1, { align: 'center' });      // 字一直摆好，底条从中间拉开到哪字就露到哪
   ctx.restore();
